@@ -159,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        "Ignis",
+                        "Velar",
                         style: GoogleFonts.poppins(
                           fontSize: 32,
                           fontWeight: FontWeight.w800,
@@ -169,7 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "Burn Brighter, Live Stronger.",
+                        "Rise. Burn. Thrive.",
                         style: GoogleFonts.inter(
                           fontSize: 16,
                           color: textColor.withOpacity(0.8),

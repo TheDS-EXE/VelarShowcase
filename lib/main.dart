@@ -132,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         AppBar(
           title: Text(
-            "Ignis",
+            "Velar",
             style: GoogleFonts.poppins(
               fontSize: 29,
               fontWeight: FontWeight.bold,
@@ -373,7 +373,8 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     if (diaryJson != null) {
       try {
         final Map<String, dynamic> decodedData = json.decode(diaryJson);
-        final Map<String, dynamic> diaryCaloriesMap = decodedData['diaryCalories'] ?? {};
+        final Map<String, dynamic> diaryCaloriesMap =
+            decodedData['diaryCalories'] ?? {};
         final String todayKey = _formatDateKey(DateTime.now());
         if (diaryCaloriesMap.containsKey(todayKey)) {
           todayCalories = diaryCaloriesMap[todayKey] as int;
@@ -521,8 +522,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
             labelText: "Enter steps taken",
             labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
             enabledBorder: UnderlineInputBorder(
-              borderSide:
-              BorderSide(color: textColor.withOpacity(0.5)),
+              borderSide: BorderSide(color: textColor.withOpacity(0.5)),
             ),
             focusedBorder: const UnderlineInputBorder(
               borderSide: BorderSide(color: accentColor),
@@ -532,13 +532,12 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Cancel",
-                style: GoogleFonts.inter(color: textColor)),
+            child:
+            Text("Cancel", style: GoogleFonts.inter(color: textColor)),
           ),
           TextButton(
             onPressed: () {
-              final int? newSteps =
-              int.tryParse(stepsController.text);
+              final int? newSteps = int.tryParse(stepsController.text);
               if (newSteps != null && newSteps > 0) {
                 setState(() {
                   stepsTaken += newSteps;
@@ -548,8 +547,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
               }
               Navigator.pop(context);
             },
-            child: Text("Log",
-                style: GoogleFonts.inter(color: accentColor)),
+            child: Text("Log", style: GoogleFonts.inter(color: accentColor)),
           ),
         ],
       ),
@@ -579,8 +577,8 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(
-            left: 16, right: 16, top: 16, bottom: 80),
+        padding:
+        const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
         child: Column(
           children: [
             _buildDailySummaryCard(),
@@ -638,7 +636,8 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     final String sleepFeedback = _getSleepQualityFeedback(sleepHours);
     final Color sleepColor = _getSleepQualityColor(sleepHours);
     // MODIFIED: Use classification instead of numbers for calories
-    final String caloriesFeedback = _classifyCaloriesRemaining(caloriesConsumed, _calorieGoal);
+    final String caloriesFeedback =
+    _classifyCaloriesRemaining(caloriesConsumed, _calorieGoal);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -663,7 +662,8 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
                 label: "Calories",
                 currentValue: caloriesConsumed,
                 goalValue: _calorieGoal,
-                displayText: caloriesFeedback, // MODIFIED: Use classification instead of numbers
+                displayText:
+                caloriesFeedback, // MODIFIED: Use classification instead of numbers
                 onTap: _navigateToCaloriesScreen,
               ),
               _buildMetricBarChart(
@@ -789,9 +789,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
                 ],
               ),
               child: Icon(
-                label == "Calories"
-                    ? Icons.restaurant_outlined
-                    : Icons.add,
+                label == "Calories" ? Icons.restaurant_outlined : Icons.add,
                 color: textColor.withOpacity(0.9),
                 size: 20,
               ),
@@ -803,25 +801,33 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     );
   }
 
+  // --- MODIFICATION START ---
+  // Replaced the simple timer dialog with the new circular sleep clock dialog.
   void _showSleepDialog(BuildContext context) {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => SleepLoggerDialog(onSleepLogged: _logSleep),
+      builder: (context) =>
+          CircularSleepLoggerDialog(onSleepLogged: _logSleep),
     );
   }
+  // --- MODIFICATION END ---
 
   Widget _buildStreakHeatmap() {
     final now = DateTime.now();
     final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
     final firstDayOfMonth = DateTime(now.year, now.month, 1);
-    final startingWeekday =
-    (firstDayOfMonth.weekday == DateTime.sunday)
+    final startingWeekday = (firstDayOfMonth.weekday == DateTime.sunday)
         ? 7
         : firstDayOfMonth.weekday;
 
     final List<String> dayHeaders = [
-      "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
     ];
 
     return GlassCard(
@@ -854,16 +860,14 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
             children: dayHeaders
                 .map((day) => Text(day,
                 style: GoogleFonts.inter(
-                    color: textColor.withOpacity(0.5),
-                    fontSize: 12)))
+                    color: textColor.withOpacity(0.5), fontSize: 12)))
                 .toList(),
           ),
           const SizedBox(height: 8),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate:
-            const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
               crossAxisSpacing: 4,
               mainAxisSpacing: 4,
@@ -886,9 +890,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
 
               return Container(
                 decoration: BoxDecoration(
-                  color: isActive
-                      ? accentColor
-                      : cardColor.withOpacity(0.3),
+                  color: isActive ? accentColor : cardColor.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(4),
                   border: isToday
                       ? Border.all(color: accentColor, width: 1.5)
@@ -902,9 +904,8 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
                       color: isActive
                           ? Colors.white
                           : textColor.withOpacity(0.5),
-                      fontWeight: isToday
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      fontWeight:
+                      isToday ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ),
@@ -925,8 +926,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
               ),
               const SizedBox(width: 6),
               Text("Active days",
-                  style: GoogleFonts.inter(
-                      color: textColor, fontSize: 12)),
+                  style: GoogleFonts.inter(color: textColor, fontSize: 12)),
               const SizedBox(width: 16),
               Container(
                 width: 12,
@@ -938,8 +938,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
               ),
               const SizedBox(width: 6),
               Text("Today",
-                  style: GoogleFonts.inter(
-                      color: textColor, fontSize: 12)),
+                  style: GoogleFonts.inter(color: textColor, fontSize: 12)),
             ],
           ),
         ],
@@ -991,11 +990,12 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     );
   }
 
-  Widget _buildPersonalBestItem(
-      {required IconData icon,
-        required String value,
-        required String label,
-        required String date}) {
+  Widget _buildPersonalBestItem({
+    required IconData icon,
+    required String value,
+    required String label,
+    required String date,
+  }) {
     return Column(
       children: [
         Icon(icon, color: accentColor, size: 24),
@@ -1014,8 +1014,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
         if (date.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(date,
-              style:
-              GoogleFonts.inter(color: accentColor, fontSize: 10)),
+              style: GoogleFonts.inter(color: accentColor, fontSize: 10)),
         ],
       ],
     );
@@ -1076,71 +1075,111 @@ class GlassCard extends StatelessWidget {
   }
 }
 
-class SleepLoggerDialog extends StatefulWidget {
+// --- MODIFICATION START ---
+// The old SleepLoggerDialog has been replaced with the new CircularSleepLoggerDialog and its painter.
+
+class CircularSleepLoggerDialog extends StatefulWidget {
   final ValueChanged<int> onSleepLogged;
 
-  const SleepLoggerDialog({super.key, required this.onSleepLogged});
+  const CircularSleepLoggerDialog({super.key, required this.onSleepLogged});
 
   @override
-  State<SleepLoggerDialog> createState() => _SleepLoggerDialogState();
+  State<CircularSleepLoggerDialog> createState() =>
+      _CircularSleepLoggerDialogState();
 }
 
-class _SleepLoggerDialogState extends State<SleepLoggerDialog>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  double _sleepHours = 0;
-  Timer? _timer;
+class _CircularSleepLoggerDialogState extends State<CircularSleepLoggerDialog> {
+  // Angles in radians. 0 is 6 AM, PI/2 is 12 PM, etc.
+  double _startAngle = 4.71239; // 10 PM
+  double _endAngle = 0; // 6 AM
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
+  bool _isDraggingStart = false;
+  bool _isDraggingEnd = false;
+
+  TimeOfDay get _startTime => _angleToTime(_startAngle);
+  TimeOfDay get _endTime => _angleToTime(_endAngle);
+
+  Duration get _sleepDuration {
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+
+    if (endMinutes >= startMinutes) {
+      return Duration(minutes: endMinutes - startMinutes);
+    } else {
+      // Crosses midnight
+      return Duration(minutes: (24 * 60 - startMinutes) + endMinutes);
+    }
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _timer?.cancel();
-    super.dispose();
+  void _onPanStart(DragStartDetails details, Size size) {
+    final Offset center = Offset(size.width / 2, size.height / 2);
+    final double radius = size.width / 2;
+    final Offset touchPosition = details.localPosition - center;
+    final double touchAngle = _getAngle(touchPosition);
+
+    // Check if the touch is near the start handle
+    final double startHandleAngle = _startAngle;
+    final double distanceToStart = _angleDistance(touchAngle, startHandleAngle);
+    if (distanceToStart < 0.2) {
+      _isDraggingStart = true;
+      return;
+    }
+
+    // Check if the touch is near the end handle
+    final double endHandleAngle = _endAngle;
+    final double distanceToEnd = _angleDistance(touchAngle, endHandleAngle);
+    if (distanceToEnd < 0.2) {
+      _isDraggingEnd = true;
+      return;
+    }
   }
 
-  void _startLogging() {
-    _controller.forward();
-    _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+  void _onPanUpdate(DragUpdateDetails details, Size size) {
+    final Offset center = Offset(size.width / 2, size.height / 2);
+    final Offset touchPosition = details.localPosition - center;
+    final double newAngle = _getAngle(touchPosition);
+
+    if (_isDraggingStart) {
       setState(() {
-        _sleepHours += 0.1;
+        _startAngle = newAngle;
       });
-    });
+    } else if (_isDraggingEnd) {
+      setState(() {
+        _endAngle = newAngle;
+      });
+    }
   }
 
-  void _stopLogging() {
-    _controller.reverse();
-    _timer?.cancel();
-    widget.onSleepLogged(_sleepHours.round());
-    Navigator.pop(context);
+  void _onPanEnd(DragEndDetails details) {
+    _isDraggingStart = false;
+    _isDraggingEnd = false;
   }
 
-  Color _getSleepQualityColor(double hours) {
-    if (hours <= 0) return Colors.grey;
-    if (hours < 4) return Colors.red;
-    if (hours < 6) return Colors.orange;
-    if (hours < 7) return Colors.yellow;
-    if (hours < 8) return Colors.lightGreen;
-    if (hours < 9) return Colors.green;
-    return Colors.teal;
+  double _getAngle(Offset position) {
+    double angle = atan2(position.dy, position.dx);
+    // Convert to 0 to 2π range
+    if (angle < 0) angle += 2 * pi;
+    return angle;
   }
 
-  String _getSleepQualityFeedback(double hours) {
-    if (hours <= 0) return "No Sleep";
-    if (hours < 4) return "Poor Rest";
-    if (hours < 6) return "Light Sleep";
-    if (hours < 7) return "Fair Rest";
-    if (hours < 8) return "Good Sleep";
-    if (hours < 9) return "Great Rest";
-    return "Perfect Sleep";
+  double _angleDistance(double a, double b) {
+    double diff = (a - b).abs();
+    return min(diff, 2 * pi - diff);
+  }
+
+  TimeOfDay _angleToTime(double angle) {
+    // Convert angle to 24-hour time
+    // 0 radians = 6:00 AM (6*60=360 minutes)
+    // 2π radians = 24 hours (1440 minutes)
+    const int minutesInDay = 24 * 60;
+    const double minutesPerRadian = minutesInDay / (2 * pi);
+
+    // Offset by 6 hours (360 minutes) so 0 radians = 6 AM
+    double minutes = (angle * minutesPerRadian + 6 * 60) % minutesInDay;
+    int hour = (minutes ~/ 60) % 24;
+    int minute = (minutes % 60).round();
+
+    return TimeOfDay(hour: hour, minute: minute);
   }
 
   @override
@@ -1148,7 +1187,9 @@ class _SleepLoggerDialogState extends State<SleepLoggerDialog>
     return Dialog(
       backgroundColor: Colors.transparent,
       child: Container(
-        padding: const EdgeInsets.all(24),
+        width: 300,
+        height: 400,
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(20),
@@ -1156,48 +1197,68 @@ class _SleepLoggerDialogState extends State<SleepLoggerDialog>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text("Log Sleep",
-                style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: textColor)),
-            const SizedBox(height: 20),
             Text(
-              "${_sleepHours.toStringAsFixed(1)} hours",
+              "Log Your Sleep",
               style: GoogleFonts.poppins(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: _getSleepQualityColor(_sleepHours)),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final size = Size(constraints.maxWidth, constraints.maxHeight);
+                  return GestureDetector(
+                    onPanStart: (details) => _onPanStart(details, size),
+                    onPanUpdate: (details) => _onPanUpdate(details, size),
+                    onPanEnd: _onPanEnd,
+                    child: CustomPaint(
+                      size: size,
+                      painter: SleepClockPainter(
+                        startAngle: _startAngle,
+                        endAngle: _endAngle,
+                        isDraggingStart: _isDraggingStart,
+                        isDraggingEnd: _isDraggingEnd,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
             Text(
-              _getSleepQualityFeedback(_sleepHours),
+              "Sleep Duration: ${_sleepDuration.inHours}h ${_sleepDuration.inMinutes.remainder(60)}m",
               style: GoogleFonts.inter(
-                  color: textColor.withOpacity(0.8), fontSize: 14),
+                fontSize: 16,
+                color: textColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                ElevatedButton(
-                  onPressed: _startLogging,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    "Cancel",
+                    style: GoogleFonts.inter(color: textColor),
                   ),
-                  child: Text("Start",
-                      style: GoogleFonts.inter(color: Colors.white)),
                 ),
                 ElevatedButton(
-                  onPressed: _stopLogging,
+                  onPressed: () {
+                    widget.onSleepLogged(_sleepDuration.inHours);
+                    Navigator.pop(context);
+                  },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
+                    backgroundColor: accentColor,
                   ),
-                  child: Text("Stop",
-                      style: GoogleFonts.inter(color: Colors.white)),
+                  child: Text(
+                    "Log Sleep",
+                    style: GoogleFonts.inter(color: Colors.white),
+                  ),
                 ),
               ],
             ),
@@ -1207,3 +1268,126 @@ class _SleepLoggerDialogState extends State<SleepLoggerDialog>
     );
   }
 }
+
+class SleepClockPainter extends CustomPainter {
+  final double startAngle;
+  final double endAngle;
+  final bool isDraggingStart;
+  final bool isDraggingEnd;
+
+  SleepClockPainter({
+    required this.startAngle,
+    required this.endAngle,
+    required this.isDraggingStart,
+    required this.isDraggingEnd,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 * 0.8;
+
+    // Draw clock background
+    final clockPaint = Paint()
+      ..color = Colors.grey.shade800.withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 12;
+    canvas.drawCircle(center, radius, clockPaint);
+
+    // Draw sleep arc
+    final sleepPaint = Paint()
+      ..color = kSleepColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 12
+      ..strokeCap = StrokeCap.round;
+
+    // Calculate the sleep arc
+    final double sleepStartAngle = startAngle;
+    double sleepSweepAngle = endAngle - startAngle;
+    if (sleepSweepAngle < 0) sleepSweepAngle += 2 * pi;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      sleepStartAngle,
+      sleepSweepAngle,
+      false,
+      sleepPaint,
+    );
+
+    // Draw clock markers
+    final markerPaint = Paint()
+      ..color = Colors.white.withOpacity(0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    for (int i = 0; i < 12; i++) {
+      final double angle = i * pi / 6;
+      final Offset start = Offset(
+        center.dx + (radius - 15) * cos(angle),
+        center.dy + (radius - 15) * sin(angle),
+      );
+      final Offset end = Offset(
+        center.dx + radius * cos(angle),
+        center.dy + radius * sin(angle),
+      );
+      canvas.drawLine(start, end, markerPaint);
+    }
+
+    // Draw time labels
+    const List<String> labels = ["6", "9", "12", "3"];
+    const List<double> labelAngles = [0, pi / 2, pi, 3 * pi / 2];
+    final textStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 12,
+    );
+
+    for (int i = 0; i < labels.length; i++) {
+      final textPainter = TextPainter(
+        text: TextSpan(text: labels[i], style: textStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      final double angle = labelAngles[i];
+      final Offset position = Offset(
+        center.dx + (radius - 30) * cos(angle) - textPainter.width / 2,
+        center.dy + (radius - 30) * sin(angle) - textPainter.height / 2,
+      );
+
+      canvas.save();
+      canvas.translate(position.dx, position.dy);
+      textPainter.paint(canvas, Offset.zero);
+      canvas.restore();
+    }
+
+    // Draw start and end handles
+    final startHandlePaint = Paint()
+      ..color = isDraggingStart ? Colors.white : kSleepColor
+      ..style = PaintingStyle.fill;
+
+    final endHandlePaint = Paint()
+      ..color = isDraggingEnd ? Colors.white : kSleepColor
+      ..style = PaintingStyle.fill;
+
+    final Offset startHandlePos = Offset(
+      center.dx + radius * cos(startAngle),
+      center.dy + radius * sin(startAngle),
+    );
+
+    final Offset endHandlePos = Offset(
+      center.dx + radius * cos(endAngle),
+      center.dy + radius * sin(endAngle),
+    );
+
+    canvas.drawCircle(startHandlePos, 12, startHandlePaint);
+    canvas.drawCircle(endHandlePos, 12, endHandlePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant SleepClockPainter oldDelegate) {
+    return startAngle != oldDelegate.startAngle ||
+        endAngle != oldDelegate.endAngle ||
+        isDraggingStart != oldDelegate.isDraggingStart ||
+        isDraggingEnd != oldDelegate.isDraggingEnd;
+  }
+}
+// --- MODIFICATION END ---

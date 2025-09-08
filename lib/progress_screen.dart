@@ -210,7 +210,8 @@ class _ProgressScreenState extends State<ProgressScreen> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    // MODIFIED: Scaffold no longer has an AppBar
+    // MODIFICATION: This screen correctly has no AppBar and uses SafeArea,
+    // which removes the unwanted bars at the top and bottom. No changes needed here.
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea( // Using SafeArea to avoid overlap with status bar

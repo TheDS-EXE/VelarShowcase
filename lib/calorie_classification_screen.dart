@@ -35,7 +35,8 @@ class CalorieClassificationScreen extends StatefulWidget {
   State<CalorieClassificationScreen> createState() => _CalorieClassificationScreenState();
 }
 
-class _CalorieClassificationScreenState extends State<CalorieClassificationScreen> with TickerProviderStateMixin {
+// MODIFICATION: Added WidgetsBindingObserver to detect when the app is resumed.
+class _CalorieClassificationScreenState extends State<CalorieClassificationScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   final Map<String, TextEditingController> _foodNameControllers = {
     'Breakfast': TextEditingController(),
     'Lunch': TextEditingController(),
@@ -53,6 +54,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   String _selectedServingSize = 'Standard';
   int _quantity = 1;
 
+  // This now holds the goal loaded from storage, which is calculated on the GoalsScreen.
   int _currentCalorieGoal = 2000;
 
   DateTime _selectedDate = DateTime.now();
@@ -98,6 +100,9 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   void initState() {
     super.initState();
 
+    // MODIFICATION: Register this class as an observer for app lifecycle events.
+    WidgetsBinding.instance.addObserver(this);
+
     _pageController = PageController(viewportFraction: 0.75);
     _pageController.addListener(() {
       if (mounted) {
@@ -127,6 +132,17 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     _loadAllData();
   }
 
+  // MODIFICATION: This new method is called when the app's state changes.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // When the user returns to the app, we reload the calorie goal to ensure
+    // it reflects any changes made on the Goals screen.
+    if (state == AppLifecycleState.resumed) {
+      _loadCalorieGoal();
+    }
+  }
+
   @override
   void didUpdateWidget(CalorieClassificationScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -140,12 +156,17 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     _progressAnimationController.forward();
   }
 
+  // MODIFICATION: This function now ensures the UI and animations update
+  // whenever a new calorie goal is loaded from storage.
   Future<void> _loadCalorieGoal() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
+        // This is the key fix: It loads the 'finalCalorieGoal' saved from the GoalsScreen.
         _currentCalorieGoal = prefs.getInt('finalCalorieGoal') ?? widget.calorieGoal;
       });
+      // Restart the progress animation to visually reflect the updated goal.
+      _progressAnimationController.forward(from: 0.0);
     }
   }
 
@@ -258,8 +279,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     return "Mega Feast";
   }
 
-
-
+  // This feedback is now based on the dynamically loaded _currentCalorieGoal.
   String _getQualitativeFeedback() {
     if (_currentCalorieGoal == 0) return "Set a goal to get started!";
     final double progress = _totalCalories / _currentCalorieGoal;
@@ -570,6 +590,9 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
 
   @override
   void dispose() {
+    // MODIFICATION: Unregister the observer to prevent memory leaks.
+    WidgetsBinding.instance.removeObserver(this);
+
     _foodNameControllers.values.forEach((controller) => controller.dispose());
     _progressAnimationController.dispose();
     _streakAnimationController.dispose();
@@ -583,6 +606,8 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
         _selectedDate.month == DateTime.now().month &&
         _selectedDate.day == DateTime.now().day;
 
+    // MODIFICATION: The Scaffold has no AppBar property, and the body uses SafeArea.
+    // This creates the clean, borderless look you requested.
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
@@ -666,7 +691,8 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   }
 
   Widget _buildTopSummarySection() {
-    final goal = _currentCalorieGoal.toDouble();
+    // The progress circle now correctly uses the goal loaded from storage.
+    final goal = _currentCalorieGoal > 0 ? _currentCalorieGoal.toDouble() : 2000.0;
     final consumed = _totalCalories.toDouble();
     final remaining = (goal - consumed).clamp(0, goal);
 
