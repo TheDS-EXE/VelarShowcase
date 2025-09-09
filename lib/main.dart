@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -23,15 +24,15 @@ const int kDailyWaterGoal = 8;
 const int kDailySleepGoal = 8;
 
 // Calorie calculation constants
-const double kCaloriesPerStep = 0.04; // Approximately 40 calories per 1000 steps
+const double kCaloriesPerStep = 0.04;
 
 // Color scheme
-const Color primaryColor = Color(0xFF2C2C2C); // Dark grey
-const Color secondaryColor = Color(0xFF8B0000); // Dark red
-const Color accentColor = Color(0xFFD32F2F); // Lighter red for accents
-const Color backgroundColor = Color(0xFF1A1A1A); // Almost black
-const Color textColor = Color(0xFFE0E0E0); // Light grey text
-const Color cardColor = Color(0xFF242424); // Slightly lighter dark for cards
+const Color primaryColor = Color(0xFF2C2C2C);
+const Color secondaryColor = Color(0xFF8B0000);
+const Color accentColor = Color(0xFFD32F2F);
+const Color backgroundColor = Color(0xFF1A1A1A);
+const Color textColor = Color(0xFFE0E0E0);
+const Color cardColor = Color(0xFF242424);
 
 // Colors for the circular progress indicators
 const Color kCaloriesColor = Color(0xFFFF6B6B);
@@ -39,11 +40,8 @@ const Color kStepsColor = Color(0xFF4ECDC4);
 const Color kWaterColor = Color(0xFF45B7D1);
 const Color kSleepColor = Color(0xFF96CEB4);
 
-// MODIFICATION: main is now async to check login status before running the app
 void main() async {
-  // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
-  // Check SharedPreferences for the "remember me" flag
   final prefs = await SharedPreferences.getInstance();
   final bool rememberMe = prefs.getBool('rememberMe') ?? false;
 
@@ -51,7 +49,6 @@ void main() async {
 }
 
 class NutritionTrackerApp extends StatelessWidget {
-  // MODIFICATION: Added rememberMe property to decide the initial screen
   final bool rememberMe;
 
   const NutritionTrackerApp({super.key, required this.rememberMe});
@@ -64,7 +61,6 @@ class NutritionTrackerApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.pinkAccent),
         useMaterial3: true,
       ),
-      // MODIFICATION: Show HomeScreen if remembered, otherwise show LoginScreen
       home: rememberMe ? const HomeScreen() : const LoginScreen(),
       routes: {
         '/home': (context) => const HomeScreen(),
@@ -544,8 +540,6 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
           children: [
             _buildDailySummaryCard(),
             const SizedBox(height: 30),
-
-            // MODIFICATION: The order of these widgets has been swapped.
             _buildPersonalBestShowcase(
               stepBestFeedback,
               calorieBurnFeedback,
@@ -554,7 +548,6 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
             const SizedBox(height: 16),
             _buildStreakHeatmap(),
             const SizedBox(height: 16),
-
             GlassCard(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -713,11 +706,10 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
               ],
             ),
           ),
-          // MODIFICATION: Increased top spacer and adjusted text alignment.
           const SizedBox(height: 10),
           Container(
             height: 30,
-            alignment: Alignment.bottomCenter, // Moves text to the bottom of its container
+            alignment: Alignment.bottomCenter,
             child: Text(
               displayText,
               style: GoogleFonts.inter(
@@ -729,7 +721,6 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
               maxLines: 2,
             ),
           ),
-          // MODIFICATION: Removed spacer here to bring label closer to the text above.
           Text(
             label,
             style: GoogleFonts.inter(
@@ -900,127 +891,62 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     );
   }
 
-  // NEW: Helper widget for the multi-circle layout.
-  Widget _buildPersonalBestCircle({
-    required IconData icon,
-    required String value,
-    required String label,
-    required String date,
-    required List<Color> colors,
-    required double size,
-  }) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: colors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colors.first.withOpacity(0.5),
-            blurRadius: 12,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: Colors.white.withOpacity(0.9), size: size * 0.2),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: size * 0.1,
-            ),
-          ),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: size * 0.08,
-            ),
-          ),
-          if (date.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text(
-              date,
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontSize: size * 0.08,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // MODIFICATION: This widget now builds the new multi-circle layout.
+  // MODIFIED: Personal Best widget to use red theme colors.
   Widget _buildPersonalBestShowcase(
       String stepBestFeedback,
       String calorieBurnFeedback,
       String waterBestFeedback,
       ) {
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Personal Bests",
+    // Calculate progress towards personal bests (0.0 to 1.0+)
+    final double stepsProgress = _mostSteps > 0 ? stepsTaken / _mostSteps : 0;
+    final double caloriesBurnedProgress = _mostCaloriesBurned > 0 ? _calculateCaloriesBurned() / _mostCaloriesBurned : 0;
+    final double waterProgress = _mostWater > 0 ? waterIntake / _mostWater : 0;
+
+    return Column(
+      children: [
+        Column(
+          children: [
+            Text(
+              "Chasing Records",
               style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: textColor)),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 140,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Positioned(
-                  left: 10,
-                  child: _buildPersonalBestCircle(
-                    icon: Icons.local_fire_department,
-                    value: calorieBurnFeedback,
-                    label: "Burned",
-                    date: _caloriesDate,
-                    colors: [kCaloriesColor.withOpacity(0.8), accentColor],
-                    size: 90,
-                  ),
-                ),
-                Positioned(
-                  right: 10,
-                  child: _buildPersonalBestCircle(
-                    icon: Icons.water_drop,
-                    value: waterBestFeedback,
-                    label: "Water",
-                    date: _waterDate,
-                    colors: [kWaterColor.withOpacity(0.8), Colors.blue.shade800],
-                    size: 90,
-                  ),
-                ),
-                _buildPersonalBestCircle(
-                  icon: Icons.directions_walk,
-                  value: stepBestFeedback,
-                  label: "Steps",
-                  date: _stepsDate,
-                  colors: [kStepsColor, Colors.teal.shade700],
-                  size: 110,
-                ),
-              ],
+                  fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
             ),
-          ),
-        ],
-      ),
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              height: 2,
+              width: 40,
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            )
+          ],
+        ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            PersonalBestCircle(
+              progress: stepsProgress,
+              classification: stepBestFeedback,
+              label: "Steps PR",
+              gradientColors: const [accentColor, secondaryColor],
+            ),
+            PersonalBestCircle(
+              progress: caloriesBurnedProgress,
+              classification: calorieBurnFeedback,
+              label: "Burn PR",
+              gradientColors: const [accentColor, secondaryColor],
+            ),
+            PersonalBestCircle(
+              progress: waterProgress,
+              classification: waterBestFeedback,
+              label: "Water PR",
+              gradientColors: const [accentColor, secondaryColor],
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1079,6 +1005,323 @@ class GlassCard extends StatelessWidget {
     );
   }
 }
+
+// MODIFIED: Entirely new implementation for the Personal Best radial progress circles.
+class PersonalBestCircle extends StatefulWidget {
+  final double progress;
+  final String classification;
+  final String label;
+  final List<Color> gradientColors;
+
+  const PersonalBestCircle({
+    super.key,
+    required this.progress,
+    required this.classification,
+    required this.label,
+    required this.gradientColors,
+  });
+
+  @override
+  State<PersonalBestCircle> createState() => _PersonalBestCircleState();
+}
+
+class _PersonalBestCircleState extends State<PersonalBestCircle>
+    with TickerProviderStateMixin {
+  late AnimationController _progressController;
+  late Animation<double> _progressAnimation;
+
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  late AnimationController _goldTransitionController;
+  late Animation<double> _goldTransitionAnimation;
+
+  late AnimationController _shimmerController;
+  late Animation<double> _shimmerAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // Controller for the main progress arc animation
+    _progressController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    _progressAnimation =
+        Tween<double>(begin: 0.0, end: widget.progress.clamp(0.0, 1.5))
+            .animate(
+          CurvedAnimation(
+              parent: _progressController, curve: Curves.easeInOutCubic),
+        );
+
+    // Controller for the pulsing glow effect when nearing a PR
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    // Controller for the red-to-gold transition animation
+    _goldTransitionController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _goldTransitionAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+          parent: _goldTransitionController, curve: Curves.easeIn),
+    );
+
+    // Controller for the shimmering metallic sweep effect on the gold ring
+    _shimmerController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _shimmerAnimation = Tween<double>(begin: 0.0, end: 2 * pi).animate(
+      CurvedAnimation(parent: _shimmerController, curve: Curves.linear),
+    );
+
+    _progressController.forward();
+    _handleAnimations(widget.progress);
+  }
+
+  @override
+  void didUpdateWidget(PersonalBestCircle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.progress != oldWidget.progress) {
+      _progressAnimation = Tween<double>(
+          begin: _progressAnimation.value,
+          end: widget.progress.clamp(0.0, 1.5))
+          .animate(
+        CurvedAnimation(
+            parent: _progressController, curve: Curves.easeInOutCubic),
+      );
+      _progressController.forward(from: 0);
+      _handleAnimations(widget.progress);
+    }
+  }
+
+  void _handleAnimations(double progress) {
+    if (progress >= 1.0) {
+      _pulseController.stop();
+      if (!_goldTransitionController.isAnimating) {
+        _goldTransitionController.forward(from: 0);
+      }
+      if (!_shimmerController.isAnimating) {
+        _shimmerController.repeat();
+      }
+    } else if (progress >= 0.9) {
+      if (!_pulseController.isAnimating) {
+        _pulseController.repeat(reverse: true);
+      }
+      _goldTransitionController.reset();
+      _shimmerController.stop();
+    } else {
+      _pulseController.stop();
+      _goldTransitionController.reset();
+      _shimmerController.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _progressController.dispose();
+    _pulseController.dispose();
+    _goldTransitionController.dispose();
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 110,
+      height: 110,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([
+          _progressAnimation,
+          _pulseAnimation,
+          _goldTransitionAnimation,
+          _shimmerAnimation,
+        ]),
+        builder: (context, child) {
+          return CustomPaint(
+            painter: _PersonalBestPainter(
+              progress: _progressAnimation.value,
+              pulseValue: _pulseAnimation.value,
+              goldTransitionValue: _goldTransitionAnimation.value,
+              shimmerValue: _shimmerAnimation.value,
+              gradientColors: widget.gradientColors,
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    widget.classification,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.label,
+                    style: GoogleFonts.inter(
+                      color: accentColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// MODIFIED: Custom painter with gold ring, shimmer, and red glow effects.
+class _PersonalBestPainter extends CustomPainter {
+  final double progress;
+  final double pulseValue;
+  final double goldTransitionValue;
+  final double shimmerValue;
+  final List<Color> gradientColors;
+
+  _PersonalBestPainter({
+    required this.progress,
+    required this.pulseValue,
+    required this.goldTransitionValue,
+    required this.shimmerValue,
+    required this.gradientColors,
+  });
+
+  static const List<Color> _goldColors = [
+    Color(0xFFFBB829), // Amber
+    Color(0xFFFFF7AD), // Champagne
+    Color(0xFFE2A03F), // Rich Gold
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 4;
+    const strokeWidth = 5.0;
+
+    // Background track
+    final trackPaint = Paint()
+      ..color = Colors.white.withOpacity(0.1)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    if (progress < 1.0) {
+      // --- State: Normal Progress (< 90%) or Nearing PR (>= 90%) ---
+
+      // Pulsing Glow when nearing PR
+      if (progress >= 0.9) {
+        final glowPaint = Paint()
+          ..color = gradientColors.first
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeWidth + 2
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4 * pulseValue);
+        canvas.drawArc(
+          Rect.fromCircle(center: center, radius: radius),
+          -pi / 2,
+          2 * pi * progress,
+          false,
+          glowPaint,
+        );
+      }
+
+      // Red Progress Arc
+      final progressPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..shader = ui.Gradient.sweep(
+          center,
+          gradientColors,
+          null, // colorStops
+          TileMode.clamp, // tileMode
+          -pi / 2, // startAngle
+          -pi / 2 + (2 * pi * progress), // endAngle
+        );
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -pi / 2,
+        2 * pi * progress,
+        false,
+        progressPaint,
+      );
+    } else {
+      // --- State: PR Achieved (>= 100%) ---
+
+      // Interpolate from red to gold during the transition animation
+      final List<Color> currentRingColors = List.generate(
+        gradientColors.length,
+            (i) => Color.lerp(gradientColors[i], _goldColors[i % _goldColors.length], goldTransitionValue)!,
+      );
+
+      // Soft Gold Glow
+      final goldGlowPaint = Paint()
+        ..color = currentRingColors.first.withOpacity(0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth + 4
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+      canvas.drawCircle(center, radius, goldGlowPaint);
+
+
+      // Gold Gradient Ring
+      final goldRingPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..shader = ui.Gradient.sweep(center, currentRingColors);
+      canvas.drawCircle(center, radius, goldRingPaint);
+
+
+      // Shimmer Sweep Effect
+      final shimmerPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth + 0.5
+        ..strokeCap = StrokeCap.round
+        ..shader = ui.Gradient.sweep(
+          center,
+          [Colors.transparent, Colors.white.withOpacity(0.4), Colors.transparent],
+          [0.0, 0.2, 0.4], // colorStops
+          TileMode.clamp, // tileMode
+          shimmerValue, // startAngle
+          shimmerValue + (pi / 2), // endAngle
+        );
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -pi / 2,
+        2 * pi, // Full circle
+        false,
+        shimmerPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PersonalBestPainter oldDelegate) {
+    // Repaint whenever any animated value changes
+    return progress != oldDelegate.progress ||
+        pulseValue != oldDelegate.pulseValue ||
+        goldTransitionValue != oldDelegate.goldTransitionValue ||
+        shimmerValue != oldDelegate.shimmerValue;
+  }
+}
+
 
 class UltraSleekSleepDialog extends StatefulWidget {
   final ValueChanged<int> onSleepLogged;
