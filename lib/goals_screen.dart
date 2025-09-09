@@ -1,3 +1,4 @@
+// lib/goals_screen.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,9 +30,8 @@ class GoalsScreen extends StatefulWidget {
   State<GoalsScreen> createState() => _GoalsScreenState();
 }
 
-// MODIFIED: Added TickerProviderStateMixin for animations
 class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin {
-  // State variables for all user settings (LOGIC UNCHANGED)
+  // State variables for all user settings
   String? _selectedGoal;
   String? _selectedGender;
   String? _selectedActivityLevel;
@@ -39,7 +39,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   int _currentHeight = 170;
   int _currentWeight = 70;
 
-  // Options for selection (LOGIC UNCHANGED)
+  // Options for selection
   final List<String> _goals = ["Lose Weight", "Maintain Weight", "Gain Muscle"];
   final Set<String> _genders = {"Male", "Female"};
   final List<String> _activityLevels = [
@@ -50,15 +50,13 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     "Super Active (very hard exercise & physical job)",
   ];
 
-  // NEW: Animation controller for the pulsing CTA button
   late AnimationController _buttonPulseController;
 
   @override
   void initState() {
     super.initState();
-    _loadProfileData(); // LOGIC UNCHANGED
+    _loadProfileData();
 
-    // NEW: Initialize animation controller
     _buttonPulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -69,13 +67,10 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
 
   @override
   void dispose() {
-    // NEW: Dispose animation controller
     _buttonPulseController.dispose();
     super.dispose();
   }
 
-  // ALL OF THE FOLLOWING DATA HANDLING METHODS ARE UNCHANGED
-  // --- START OF UNCHANGED LOGIC ---
   Future<void> _saveString(String key, String? value) async {
     if (value == null) return;
     final prefs = await SharedPreferences.getInstance();
@@ -114,12 +109,8 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     });
   }
 
-  // MODIFICATION: Added comments to clarify this function is correct.
-  // This function correctly calculates the user's calorie goal based on their
-  // profile data and saves it to the device's storage.
   Future<void> _calculateAndSaveCalorieGoal() async {
     final prefs = await SharedPreferences.getInstance();
-    // Use sensible defaults if no data has been selected yet.
     final gender = _selectedGender ?? 'Male';
     final age = _currentAge;
     final height = _currentHeight;
@@ -127,14 +118,13 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     final activityLevel = _selectedActivityLevel ?? "Sedentary (little or no exercise)";
     final goal = _selectedGoal ?? "Maintain Weight";
 
-    double bmr; // Basal Metabolic Rate calculation using Mifflin-St Jeor equation
+    double bmr;
     if (gender == 'Male') {
       bmr = 10 * weight + 6.25 * height - 5 * age + 5;
     } else {
       bmr = 10 * weight + 6.25 * height - 5 * age - 161;
     }
 
-    // Determine the activity multiplier to calculate Total Daily Energy Expenditure (TDEE).
     double activityMultiplier;
     if (activityLevel.startsWith("Sedentary")) {
       activityMultiplier = 1.2;
@@ -149,14 +139,13 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     }
     final double tdee = bmr * activityMultiplier;
 
-    // Adjust the TDEE based on the user's fitness goal.
     double finalCalorieTarget;
     switch (goal) {
       case "Lose Weight":
-        finalCalorieTarget = tdee - 500; // 500 calorie deficit
+        finalCalorieTarget = tdee - 500;
         break;
       case "Gain Muscle":
-        finalCalorieTarget = tdee + 300; // 300 calorie surplus
+        finalCalorieTarget = tdee + 300;
         break;
       case "Maintain Weight":
       default:
@@ -164,13 +153,10 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
         break;
     }
 
-    // Save the final calculated goal, ensuring it's within a reasonable range.
     int calculatedGoal = finalCalorieTarget.clamp(1200, 5000).round();
     await prefs.setInt('finalCalorieGoal', calculatedGoal);
   }
 
-  // MODIFICATION: Added comments to clarify this function is correct.
-  // This function saves all profile settings and triggers the calorie calculation.
   Future<void> _saveProfileData() async {
     final prefs = await SharedPreferences.getInstance();
     final weightHistory = prefs.getStringList('weightHistory') ?? [];
@@ -200,10 +186,8 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       prefs.setInt("userHeight", _currentHeight),
     ]);
 
-    // This is the crucial step that calculates and saves the new goal.
     await _calculateAndSaveCalorieGoal();
 
-    // Give user feedback.
     if (mounted) {
       setState(() {
         _currentWeight = _currentWeight;
@@ -217,75 +201,63 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       );
     }
   }
-  // --- END OF UNCHANGED LOGIC ---
 
-
-  // --- START OF NEW UI CODE ---
+  // MODIFICATION: Removed the Scaffold and SafeArea to integrate with main.dart's structure.
+  // The root widget is now the SingleChildScrollView.
   @override
   Widget build(BuildContext context) {
-    // MODIFICATION: Scaffold has no AppBar, and the body is wrapped in SafeArea.
-    // This removes any extra bars/borders at the top and bottom of the screen.
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // --- Fitness Goal Section ---
-              _buildSectionTitle("What's Your Goal?"),
-              const SizedBox(height: 16),
-              _buildGoalSelection(),
-              const SizedBox(height: 32),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSectionTitle("What's Your Goal?"),
+          const SizedBox(height: 16),
+          _buildGoalSelection(),
+          const SizedBox(height: 32),
 
-              // --- Gender Section ---
-              _buildSectionTitle("Select Your Gender"),
-              const SizedBox(height: 16),
-              _buildGenderSelection(),
-              const SizedBox(height: 32),
+          _buildSectionTitle("Select Your Gender"),
+          const SizedBox(height: 16),
+          _buildGenderSelection(),
+          const SizedBox(height: 32),
 
-              // --- Stats Section ---
-              _buildSectionTitle("Tell Us About Yourself"),
-              const SizedBox(height: 24),
-              _buildStatSlider(
-                title: "Age",
-                value: _currentAge,
-                minValue: 10,
-                maxValue: 100,
-                onChanged: (value) {
-                  setState(() => _currentAge = value);
-                  _saveInt("user_age", value);
-                },
-              ),
-              const SizedBox(height: 20),
-              _buildStatSlider(
-                title: "Height",
-                value: _currentHeight,
-                minValue: 100,
-                maxValue: 250,
-                suffix: " cm",
-                onChanged: (value) {
-                  setState(() => _currentHeight = value);
-                  _saveInt("userHeight", value);
-                },
-              ),
-              const SizedBox(height: 20),
-              _buildStatSlider(
-                title: "Current Weight",
-                value: _currentWeight,
-                minValue: 30,
-                maxValue: 200,
-                suffix: " kg",
-                onChanged: (value) => setState(() => _currentWeight = value),
-              ),
-              const SizedBox(height: 50),
-
-              // --- Continue Button ---
-              _buildContinueButton(),
-            ],
+          _buildSectionTitle("Tell Us About Yourself"),
+          const SizedBox(height: 24),
+          _buildStatSlider(
+            title: "Age",
+            value: _currentAge,
+            minValue: 10,
+            maxValue: 100,
+            onChanged: (value) {
+              setState(() => _currentAge = value);
+              _saveInt("user_age", value);
+            },
           ),
-        ),
+          const SizedBox(height: 20),
+          _buildStatSlider(
+            title: "Height",
+            value: _currentHeight,
+            minValue: 100,
+            maxValue: 250,
+            suffix: " cm",
+            onChanged: (value) {
+              setState(() => _currentHeight = value);
+              _saveInt("userHeight", value);
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildStatSlider(
+            title: "Current Weight",
+            value: _currentWeight,
+            minValue: 30,
+            maxValue: 200,
+            suffix: " kg",
+            onChanged: (value) => setState(() => _currentWeight = value),
+          ),
+          const SizedBox(height: 50),
+
+          _buildContinueButton(),
+        ],
       ),
     );
   }
@@ -302,7 +274,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     );
   }
 
-  // NEW: Replaces radio buttons with large, interactive cards
   Widget _buildGoalSelection() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -348,7 +319,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               Icon(icon, size: 36, color: isSelected ? accentColor : textColor.withOpacity(0.7)),
               const SizedBox(height: 12),
               Text(
-                goal.split(' ').join('\n'), // Split text into two lines
+                goal.split(' ').join('\n'),
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   color: isSelected ? accentColor : textColor,
@@ -363,7 +334,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     );
   }
 
-  // NEW: Replaces segmented buttons with animated gender silhouettes
   Widget _buildGenderSelection() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -412,7 +382,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     );
   }
 
-  // NEW: Replaces +/- inputs with a modern, animated slider component
   Widget _buildStatSlider({
     required String title,
     required int value,
@@ -436,8 +405,8 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
                     return FadeTransition(opacity: animation, child: child);
                   },
                   child: Text(
-                    '${value}',
-                    key: ValueKey<int>(value), // Important for AnimatedSwitcher to detect change
+                    '$value',
+                    key: ValueKey<int>(value),
                     style: GoogleFonts.poppins(color: textColor, fontSize: 24, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -474,7 +443,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     );
   }
 
-  // NEW: Replaces the basic button with a large, glowing, pulsing CTA
   Widget _buildContinueButton() {
     return AnimatedBuilder(
       animation: _buttonPulseController,

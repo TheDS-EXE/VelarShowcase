@@ -363,11 +363,9 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     return Colors.teal;
   }
 
-  // MODIFICATION: This function now reads calorie data from the detailed food diary
   void _loadDailyData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // New logic for loading calories from the food diary
     final String? diaryJson = prefs.getString('foodDiary');
     int todayCalories = 0;
     if (diaryJson != null) {
@@ -380,17 +378,15 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
           todayCalories = diaryCaloriesMap[todayKey] as int;
         }
       } catch (e) {
-        // Fallback to the old key in case of a JSON error
         print('Error loading calorie diary data: $e');
         todayCalories = prefs.getInt('totalCalories') ?? 0;
       }
     } else {
-      // Fallback if the diary doesn't exist yet
       todayCalories = prefs.getInt('totalCalories') ?? 0;
     }
 
     setState(() {
-      caloriesConsumed = todayCalories; // Set the correctly loaded calories
+      caloriesConsumed = todayCalories;
       _calorieGoal = prefs.getInt('finalCalorieGoal') ?? 2000;
       stepsTaken = prefs.getInt(_stepsKey) ?? 0;
       waterIntake = prefs.getInt(_waterKey) ?? 0;
@@ -441,8 +437,6 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
   }
 
-  // MODIFICATION: Removed saving to 'totalCalories' to prevent data conflicts.
-  // The food screen is now the single source of truth for calorie data.
   void _saveDailyData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_stepsKey, stepsTaken);
@@ -505,66 +499,33 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     _saveDailyData();
   }
 
-  void _addSteps() async {
-    final TextEditingController stepsController = TextEditingController();
-    await showDialog(
+  void _addSteps(int newSteps) {
+    if (newSteps > 0) {
+      setState(() {
+        stepsTaken += newSteps;
+      });
+      _saveDailyData();
+      _loadPersonalBests();
+    }
+  }
+
+  void _showAddStepsDialog() {
+    showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: cardColor,
-        title: Text("Log Steps",
-            style: GoogleFonts.poppins(color: textColor)),
-        content: TextField(
-          controller: stepsController,
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: textColor),
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: "Enter steps taken",
-            labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: textColor.withOpacity(0.5)),
-            ),
-            focusedBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: accentColor),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-            Text("Cancel", style: GoogleFonts.inter(color: textColor)),
-          ),
-          TextButton(
-            onPressed: () {
-              final int? newSteps = int.tryParse(stepsController.text);
-              if (newSteps != null && newSteps > 0) {
-                setState(() {
-                  stepsTaken += newSteps;
-                });
-                _saveDailyData();
-                _loadPersonalBests();
-              }
-              Navigator.pop(context);
-            },
-            child: Text("Log", style: GoogleFonts.inter(color: accentColor)),
-          ),
-        ],
-      ),
+      builder: (context) => UltraSleekStepsDialog(onStepsLogged: _addSteps),
     );
   }
 
-  // ADDED: Function to classify calories remaining like the calorie classification screen
-  String _classifyCaloriesRemaining(int caloriesConsumed, int calorieGoal) {
-    final int caloriesRemaining = calorieGoal - caloriesConsumed;
+  String _classifyCalories(int caloriesConsumed, int calorieGoal) {
+    if (calorieGoal == 0) return "Set a goal to get started!";
+    final double progress = caloriesConsumed / calorieGoal;
 
-    if (caloriesRemaining <= 0) return "Overshot Gains";
-    if (caloriesRemaining <= 50) return "Final Push";
-    if (caloriesRemaining <= 150) return "Cruising Strong";
-    if (caloriesRemaining <= 300) return "Warm-Up Phase";
-    if (caloriesRemaining <= 500) return "Getting Started";
-    if (caloriesRemaining <= 700) return "Empty Tank";
-    return "Set a Goal!";
+    if (progress <= 0.0) return "Empty Tank";
+    if (progress < 0.4) return "Warm-Up Phase";
+    if (progress < 0.75) return "Cruising Strong";
+    if (progress < 1.0) return "Final Push";
+    if (progress <= 1.1) return "Perfect Hit!";
+    return "Overshot Gains";
   }
 
   @override
@@ -583,14 +544,17 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
           children: [
             _buildDailySummaryCard(),
             const SizedBox(height: 30),
-            _buildStreakHeatmap(),
-            const SizedBox(height: 16),
+
+            // MODIFICATION: The order of these widgets has been swapped.
             _buildPersonalBestShowcase(
               stepBestFeedback,
               calorieBurnFeedback,
               waterBestFeedback,
             ),
             const SizedBox(height: 16),
+            _buildStreakHeatmap(),
+            const SizedBox(height: 16),
+
             GlassCard(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -635,9 +599,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     final String stepFeedback = _getStepLevelFeedback(stepsTaken);
     final String sleepFeedback = _getSleepQualityFeedback(sleepHours);
     final Color sleepColor = _getSleepQualityColor(sleepHours);
-    // MODIFIED: Use classification instead of numbers for calories
-    final String caloriesFeedback =
-    _classifyCaloriesRemaining(caloriesConsumed, _calorieGoal);
+    final String caloriesFeedback = _classifyCalories(caloriesConsumed, _calorieGoal);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -662,8 +624,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
                 label: "Calories",
                 currentValue: caloriesConsumed,
                 goalValue: _calorieGoal,
-                displayText:
-                caloriesFeedback, // MODIFIED: Use classification instead of numbers
+                displayText: caloriesFeedback,
                 onTap: _navigateToCaloriesScreen,
               ),
               _buildMetricBarChart(
@@ -673,7 +634,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
                 currentValue: stepsTaken,
                 goalValue: kDailyStepGoal,
                 displayText: stepFeedback,
-                onTap: _addSteps,
+                onTap: _showAddStepsDialog,
               ),
               _buildMetricBarChart(
                 icon: Icons.water_drop_outlined,
@@ -752,16 +713,23 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            displayText,
-            style: GoogleFonts.inter(
-              color: textColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
+          // MODIFICATION: Increased top spacer and adjusted text alignment.
+          const SizedBox(height: 10),
+          Container(
+            height: 30,
+            alignment: Alignment.bottomCenter, // Moves text to the bottom of its container
+            child: Text(
+              displayText,
+              style: GoogleFonts.inter(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
             ),
-            textAlign: TextAlign.center,
           ),
+          // MODIFICATION: Removed spacer here to bring label closer to the text above.
           Text(
             label,
             style: GoogleFonts.inter(
@@ -769,14 +737,11 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
               fontSize: 12,
             ),
           ),
-          const SizedBox(height: 12),
-          // --- MODIFICATION START ---
-          // Replaced IconButton with a custom GestureDetector to fix RenderFlex error
-          // and apply a circular background with a glow effect.
+          const SizedBox(height: 8),
           GestureDetector(
             onTap: onTap,
             child: Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.25),
                 shape: BoxShape.circle,
@@ -789,28 +754,23 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
                 ],
               ),
               child: Icon(
-                label == "Calories" ? Icons.restaurant_outlined : Icons.add,
+                Icons.add,
                 color: textColor.withOpacity(0.9),
                 size: 20,
               ),
             ),
           ),
-          // --- MODIFICATION END ---
         ],
       ),
     );
   }
 
-  // --- MODIFICATION START ---
-  // Replaced the simple timer dialog with the new circular sleep clock dialog.
   void _showSleepDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) =>
-          CircularSleepLoggerDialog(onSleepLogged: _logSleep),
+      builder: (context) => UltraSleekSleepDialog(onSleepLogged: _logSleep),
     );
   }
-  // --- MODIFICATION END ---
 
   Widget _buildStreakHeatmap() {
     final now = DateTime.now();
@@ -821,13 +781,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
         : firstDayOfMonth.weekday;
 
     final List<String> dayHeaders = [
-      "Mon",
-      "Tue",
-      "Wed",
-      "Thu",
-      "Fri",
-      "Sat",
-      "Sun"
+      "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
     ];
 
     return GlassCard(
@@ -946,6 +900,71 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     );
   }
 
+  // NEW: Helper widget for the multi-circle layout.
+  Widget _buildPersonalBestCircle({
+    required IconData icon,
+    required String value,
+    required String label,
+    required String date,
+    required List<Color> colors,
+    required double size,
+  }) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.first.withOpacity(0.5),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.white.withOpacity(0.9), size: size * 0.2),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: size * 0.1,
+            ),
+          ),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: size * 0.08,
+            ),
+          ),
+          if (date.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              date,
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: size * 0.08,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // MODIFICATION: This widget now builds the new multi-circle layout.
   Widget _buildPersonalBestShowcase(
       String stepBestFeedback,
       String calorieBurnFeedback,
@@ -961,64 +980,50 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: textColor)),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildPersonalBestItem(
-                icon: Icons.directions_walk,
-                value: stepBestFeedback,
-                label: "Most Steps",
-                date: _stepsDate,
-              ),
-              _buildPersonalBestItem(
-                icon: Icons.local_fire_department,
-                value: calorieBurnFeedback,
-                label: "Calories Burned",
-                date: _caloriesDate,
-              ),
-              _buildPersonalBestItem(
-                icon: Icons.water_drop,
-                value: waterBestFeedback,
-                label: "Water Intake",
-                date: _waterDate,
-              ),
-            ],
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 140,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  left: 10,
+                  child: _buildPersonalBestCircle(
+                    icon: Icons.local_fire_department,
+                    value: calorieBurnFeedback,
+                    label: "Burned",
+                    date: _caloriesDate,
+                    colors: [kCaloriesColor.withOpacity(0.8), accentColor],
+                    size: 90,
+                  ),
+                ),
+                Positioned(
+                  right: 10,
+                  child: _buildPersonalBestCircle(
+                    icon: Icons.water_drop,
+                    value: waterBestFeedback,
+                    label: "Water",
+                    date: _waterDate,
+                    colors: [kWaterColor.withOpacity(0.8), Colors.blue.shade800],
+                    size: 90,
+                  ),
+                ),
+                _buildPersonalBestCircle(
+                  icon: Icons.directions_walk,
+                  value: stepBestFeedback,
+                  label: "Steps",
+                  date: _stepsDate,
+                  colors: [kStepsColor, Colors.teal.shade700],
+                  size: 110,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPersonalBestItem({
-    required IconData icon,
-    required String value,
-    required String label,
-    required String date,
-  }) {
-    return Column(
-      children: [
-        Icon(icon, color: accentColor, size: 24),
-        const SizedBox(height: 6),
-        Text(value,
-            style: GoogleFonts.inter(
-              color: textColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2),
-        Text(label,
-            style: GoogleFonts.inter(
-                color: textColor.withOpacity(0.7), fontSize: 10)),
-        if (date.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(date,
-              style: GoogleFonts.inter(color: accentColor, fontSize: 10)),
-        ],
-      ],
-    );
-  }
 
   Widget _buildActionButton(
       {required IconData icon,
@@ -1075,319 +1080,577 @@ class GlassCard extends StatelessWidget {
   }
 }
 
-// --- MODIFICATION START ---
-// The old SleepLoggerDialog has been replaced with the new CircularSleepLoggerDialog and its painter.
-
-class CircularSleepLoggerDialog extends StatefulWidget {
+class UltraSleekSleepDialog extends StatefulWidget {
   final ValueChanged<int> onSleepLogged;
 
-  const CircularSleepLoggerDialog({super.key, required this.onSleepLogged});
+  const UltraSleekSleepDialog({super.key, required this.onSleepLogged});
 
   @override
-  State<CircularSleepLoggerDialog> createState() =>
-      _CircularSleepLoggerDialogState();
+  State<UltraSleekSleepDialog> createState() => _UltraSleekSleepDialogState();
 }
 
-class _CircularSleepLoggerDialogState extends State<CircularSleepLoggerDialog> {
-  // Angles in radians. 0 is 6 AM, PI/2 is 12 PM, etc.
-  double _startAngle = 4.71239; // 10 PM
-  double _endAngle = 0; // 6 AM
+class _UltraSleekSleepDialogState extends State<UltraSleekSleepDialog>
+    with TickerProviderStateMixin {
+  int _selectedHours = 8;
+  late AnimationController _fadeController;
+  late AnimationController _scaleController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
 
-  bool _isDraggingStart = false;
-  bool _isDraggingEnd = false;
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 350),
+      vsync: this,
+    );
 
-  TimeOfDay get _startTime => _angleToTime(_startAngle);
-  TimeOfDay get _endTime => _angleToTime(_endAngle);
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
+    );
 
-  Duration get _sleepDuration {
-    final startMinutes = _startTime.hour * 60 + _startTime.minute;
-    final endMinutes = _endTime.hour * 60 + _endTime.minute;
-
-    if (endMinutes >= startMinutes) {
-      return Duration(minutes: endMinutes - startMinutes);
-    } else {
-      // Crosses midnight
-      return Duration(minutes: (24 * 60 - startMinutes) + endMinutes);
-    }
+    _fadeController.forward();
+    _scaleController.forward();
   }
 
-  void _onPanStart(DragStartDetails details, Size size) {
-    final Offset center = Offset(size.width / 2, size.height / 2);
-    final double radius = size.width / 2;
-    final Offset touchPosition = details.localPosition - center;
-    final double touchAngle = _getAngle(touchPosition);
-
-    // Check if the touch is near the start handle
-    final double startHandleAngle = _startAngle;
-    final double distanceToStart = _angleDistance(touchAngle, startHandleAngle);
-    if (distanceToStart < 0.2) {
-      _isDraggingStart = true;
-      return;
-    }
-
-    // Check if the touch is near the end handle
-    final double endHandleAngle = _endAngle;
-    final double distanceToEnd = _angleDistance(touchAngle, endHandleAngle);
-    if (distanceToEnd < 0.2) {
-      _isDraggingEnd = true;
-      return;
-    }
-  }
-
-  void _onPanUpdate(DragUpdateDetails details, Size size) {
-    final Offset center = Offset(size.width / 2, size.height / 2);
-    final Offset touchPosition = details.localPosition - center;
-    final double newAngle = _getAngle(touchPosition);
-
-    if (_isDraggingStart) {
-      setState(() {
-        _startAngle = newAngle;
-      });
-    } else if (_isDraggingEnd) {
-      setState(() {
-        _endAngle = newAngle;
-      });
-    }
-  }
-
-  void _onPanEnd(DragEndDetails details) {
-    _isDraggingStart = false;
-    _isDraggingEnd = false;
-  }
-
-  double _getAngle(Offset position) {
-    double angle = atan2(position.dy, position.dx);
-    // Convert to 0 to 2π range
-    if (angle < 0) angle += 2 * pi;
-    return angle;
-  }
-
-  double _angleDistance(double a, double b) {
-    double diff = (a - b).abs();
-    return min(diff, 2 * pi - diff);
-  }
-
-  TimeOfDay _angleToTime(double angle) {
-    // Convert angle to 24-hour time
-    // 0 radians = 6:00 AM (6*60=360 minutes)
-    // 2π radians = 24 hours (1440 minutes)
-    const int minutesInDay = 24 * 60;
-    const double minutesPerRadian = minutesInDay / (2 * pi);
-
-    // Offset by 6 hours (360 minutes) so 0 radians = 6 AM
-    double minutes = (angle * minutesPerRadian + 6 * 60) % minutesInDay;
-    int hour = (minutes ~/ 60) % 24;
-    int minute = (minutes % 60).round();
-
-    return TimeOfDay(hour: hour, minute: minute);
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _scaleController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: 300,
-        height: 400,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "Log Your Sleep",
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: textColor,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final size = Size(constraints.maxWidth, constraints.maxHeight);
-                  return GestureDetector(
-                    onPanStart: (details) => _onPanStart(details, size),
-                    onPanUpdate: (details) => _onPanUpdate(details, size),
-                    onPanEnd: _onPanEnd,
-                    child: CustomPaint(
-                      size: size,
-                      painter: SleepClockPainter(
-                        startAngle: _startAngle,
-                        endAngle: _endAngle,
-                        isDraggingStart: _isDraggingStart,
-                        isDraggingEnd: _isDraggingEnd,
+    return AnimatedBuilder(
+      animation: Listenable.merge([_fadeAnimation, _scaleAnimation]),
+      builder: (context, child) {
+        return Material(
+          color: Colors.black.withOpacity(0.6 * _fadeAnimation.value),
+          child: Center(
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 40),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.8),
+                      blurRadius: 30,
+                      spreadRadius: 0,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.bedtime_outlined,
+                            color: const Color(0xFF007AFF),
+                            size: 32,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            "Sleep Duration",
+                            style: GoogleFonts.inter(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "How many hours did you sleep?",
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              color: Colors.white.withOpacity(0.6),
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                },
+
+                    Container(
+                      height: 180,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            height: 60,
+                            width: double.infinity,
+                            margin: const EdgeInsets.symmetric(horizontal: 20),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF007AFF).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFF007AFF).withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          ListWheelScrollView.useDelegate(
+                            itemExtent: 60,
+                            perspective: 0.003,
+                            diameterRatio: 1.5,
+                            physics: const FixedExtentScrollPhysics(),
+                            onSelectedItemChanged: (index) {
+                              setState(() {
+                                _selectedHours = index + 1;
+                              });
+                              HapticFeedback.selectionClick();
+                            },
+                            childDelegate: ListWheelChildBuilderDelegate(
+                              childCount: 12,
+                              builder: (context, index) {
+                                final hour = index + 1;
+                                final isSelected = _selectedHours == hour;
+
+                                return AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeOut,
+                                  child: Center(
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                                      textBaseline: TextBaseline.alphabetic,
+                                      children: [
+                                        Text(
+                                          hour.toString(),
+                                          style: GoogleFonts.inter(
+                                            fontSize: isSelected ? 34 : 24,
+                                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                            color: isSelected
+                                                ? Colors.white
+                                                : Colors.white.withOpacity(0.4),
+                                            height: 1.0,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          hour == 1 ? "hour" : "hours",
+                                          style: GoogleFonts.inter(
+                                            fontSize: isSelected ? 16 : 14,
+                                            fontWeight: FontWeight.w400,
+                                            color: isSelected
+                                                ? Colors.white.withOpacity(0.8)
+                                                : Colors.white.withOpacity(0.3),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _getSleepQualityColor(_selectedHours).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _getSleepQualityColor(_selectedHours).withOpacity(0.4),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              _getSleepQualityFeedback(_selectedHours),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: _getSleepQualityColor(_selectedHours),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.pop(context);
+                              },
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                "Cancel",
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withOpacity(0.6),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                HapticFeedback.mediumImpact();
+                                widget.onSleepLogged(_selectedHours);
+                                Navigator.pop(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF007AFF),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                "Log Sleep",
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              "Sleep Duration: ${_sleepDuration.inHours}h ${_sleepDuration.inMinutes.remainder(60)}m",
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                color: textColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    "Cancel",
-                    style: GoogleFonts.inter(color: textColor),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    widget.onSleepLogged(_sleepDuration.inHours);
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentColor,
-                  ),
-                  child: Text(
-                    "Log Sleep",
-                    style: GoogleFonts.inter(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
+  }
+
+  String _getSleepQualityFeedback(int hours) {
+    if (hours <= 0) return "No Sleep";
+    if (hours < 4) return "Poor Rest";
+    if (hours < 6) return "Light Sleep";
+    if (hours < 7) return "Fair Rest";
+    if (hours < 8) return "Good Sleep";
+    if (hours < 9) return "Great Rest";
+    return "Perfect Sleep";
+  }
+
+  Color _getSleepQualityColor(int hours) {
+    if (hours <= 0) return Colors.grey;
+    if (hours < 4) return const Color(0xFFFF453A);
+    if (hours < 6) return const Color(0xFFFF9F0A);
+    if (hours < 7) return const Color(0xFFFFD60A);
+    if (hours < 8) return const Color(0xFF30D158);
+    if (hours < 9) return const Color(0xFF00C7BE);
+    return const Color(0xFF007AFF);
   }
 }
 
-class SleepClockPainter extends CustomPainter {
-  final double startAngle;
-  final double endAngle;
-  final bool isDraggingStart;
-  final bool isDraggingEnd;
+class UltraSleekStepsDialog extends StatefulWidget {
+  final ValueChanged<int> onStepsLogged;
 
-  SleepClockPainter({
-    required this.startAngle,
-    required this.endAngle,
-    required this.isDraggingStart,
-    required this.isDraggingEnd,
-  });
+  const UltraSleekStepsDialog({super.key, required this.onStepsLogged});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 * 0.8;
+  State<UltraSleekStepsDialog> createState() => _UltraSleekStepsDialogState();
+}
 
-    // Draw clock background
-    final clockPaint = Paint()
-      ..color = Colors.grey.shade800.withOpacity(0.3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 12;
-    canvas.drawCircle(center, radius, clockPaint);
+class _UltraSleekStepsDialogState extends State<UltraSleekStepsDialog>
+    with TickerProviderStateMixin {
+  int _selectedMinutes = 30;
+  late AnimationController _fadeController;
+  late AnimationController _scaleController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
 
-    // Draw sleep arc
-    final sleepPaint = Paint()
-      ..color = kSleepColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 12
-      ..strokeCap = StrokeCap.round;
+  final int _stepsPerMinute = 100;
 
-    // Calculate the sleep arc
-    final double sleepStartAngle = startAngle;
-    double sleepSweepAngle = endAngle - startAngle;
-    if (sleepSweepAngle < 0) sleepSweepAngle += 2 * pi;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      sleepStartAngle,
-      sleepSweepAngle,
-      false,
-      sleepPaint,
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 350),
+      vsync: this,
     );
 
-    // Draw clock markers
-    final markerPaint = Paint()
-      ..color = Colors.white.withOpacity(0.7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    for (int i = 0; i < 12; i++) {
-      final double angle = i * pi / 6;
-      final Offset start = Offset(
-        center.dx + (radius - 15) * cos(angle),
-        center.dy + (radius - 15) * sin(angle),
-      );
-      final Offset end = Offset(
-        center.dx + radius * cos(angle),
-        center.dy + radius * sin(angle),
-      );
-      canvas.drawLine(start, end, markerPaint);
-    }
-
-    // Draw time labels
-    const List<String> labels = ["6", "9", "12", "3"];
-    const List<double> labelAngles = [0, pi / 2, pi, 3 * pi / 2];
-    final textStyle = TextStyle(
-      color: Colors.white,
-      fontSize: 12,
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
     );
 
-    for (int i = 0; i < labels.length; i++) {
-      final textPainter = TextPainter(
-        text: TextSpan(text: labels[i], style: textStyle),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      final double angle = labelAngles[i];
-      final Offset position = Offset(
-        center.dx + (radius - 30) * cos(angle) - textPainter.width / 2,
-        center.dy + (radius - 30) * sin(angle) - textPainter.height / 2,
-      );
-
-      canvas.save();
-      canvas.translate(position.dx, position.dy);
-      textPainter.paint(canvas, Offset.zero);
-      canvas.restore();
-    }
-
-    // Draw start and end handles
-    final startHandlePaint = Paint()
-      ..color = isDraggingStart ? Colors.white : kSleepColor
-      ..style = PaintingStyle.fill;
-
-    final endHandlePaint = Paint()
-      ..color = isDraggingEnd ? Colors.white : kSleepColor
-      ..style = PaintingStyle.fill;
-
-    final Offset startHandlePos = Offset(
-      center.dx + radius * cos(startAngle),
-      center.dy + radius * sin(startAngle),
-    );
-
-    final Offset endHandlePos = Offset(
-      center.dx + radius * cos(endAngle),
-      center.dy + radius * sin(endAngle),
-    );
-
-    canvas.drawCircle(startHandlePos, 12, startHandlePaint);
-    canvas.drawCircle(endHandlePos, 12, endHandlePaint);
+    _fadeController.forward();
+    _scaleController.forward();
   }
 
   @override
-  bool shouldRepaint(covariant SleepClockPainter oldDelegate) {
-    return startAngle != oldDelegate.startAngle ||
-        endAngle != oldDelegate.endAngle ||
-        isDraggingStart != oldDelegate.isDraggingStart ||
-        isDraggingEnd != oldDelegate.isDraggingEnd;
+  void dispose() {
+    _fadeController.dispose();
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  String _getWalkIntensityFeedback(int minutes) {
+    if (minutes <= 0) return "No Activity";
+    if (minutes < 15) return "Quick Stroll";
+    if (minutes < 30) return "Light Walk";
+    if (minutes < 60) return "Moderate Pace";
+    if (minutes < 90) return "Brisk Walk";
+    if (minutes < 120) return "Long Trek";
+    return "Power Walk";
+  }
+
+  Color _getWalkIntensityColor(int minutes) {
+    if (minutes <= 0) return Colors.grey;
+    if (minutes < 15) return const Color(0xFF5AC8FA);
+    if (minutes < 30) return const Color(0xFF00C7BE);
+    if (minutes < 60) return const Color(0xFF30D158);
+    if (minutes < 90) return const Color(0xFFFF9F0A);
+    if (minutes < 120) return const Color(0xFFFF453A);
+    return const Color(0xFFBF5AF2);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accent = kStepsColor;
+    final int calculatedSteps = _selectedMinutes * _stepsPerMinute;
+
+    return AnimatedBuilder(
+      animation: Listenable.merge([_fadeAnimation, _scaleAnimation]),
+      builder: (context, child) {
+        return Material(
+          color: Colors.black.withOpacity(0.6 * _fadeAnimation.value),
+          child: Center(
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 40),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.8),
+                      blurRadius: 30,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.timer_outlined,
+                            color: accent,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            "Activity Duration",
+                            style: GoogleFonts.inter(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "How many minutes did you walk?",
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              color: Colors.white.withOpacity(0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      height: 180,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            height: 60,
+                            width: double.infinity,
+                            margin: const EdgeInsets.symmetric(horizontal: 20),
+                            decoration: BoxDecoration(
+                              color: accent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: accent.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          ListWheelScrollView.useDelegate(
+                            controller: FixedExtentScrollController(initialItem: _selectedMinutes -1),
+                            itemExtent: 60,
+                            perspective: 0.003,
+                            diameterRatio: 1.5,
+                            physics: const FixedExtentScrollPhysics(),
+                            onSelectedItemChanged: (index) {
+                              setState(() {
+                                _selectedMinutes = index + 1;
+                              });
+                              HapticFeedback.selectionClick();
+                            },
+                            childDelegate: ListWheelChildBuilderDelegate(
+                              childCount: 180,
+                              builder: (context, index) {
+                                final minute = index + 1;
+                                final isSelected = _selectedMinutes == minute;
+
+                                return Center(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                                    children: [
+                                      Text(
+                                        minute.toString(),
+                                        style: GoogleFonts.inter(
+                                          fontSize: isSelected ? 34 : 24,
+                                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                          color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        "min",
+                                        style: GoogleFonts.inter(
+                                          fontSize: isSelected ? 16 : 14,
+                                          fontWeight: FontWeight.w400,
+                                          color: isSelected ? Colors.white.withOpacity(0.8) : Colors.white.withOpacity(0.3),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _getWalkIntensityColor(_selectedMinutes).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _getWalkIntensityColor(_selectedMinutes).withOpacity(0.4),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              "${_getWalkIntensityFeedback(_selectedMinutes)}  •  ~$calculatedSteps steps",
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: _getWalkIntensityColor(_selectedMinutes),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text(
+                                "Cancel",
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withOpacity(0.6),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                HapticFeedback.mediumImpact();
+                                widget.onStepsLogged(calculatedSteps);
+                                Navigator.pop(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: accent,
+                                foregroundColor: Colors.black.withOpacity(0.7),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                "Log Activity",
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
-// --- MODIFICATION END ---
