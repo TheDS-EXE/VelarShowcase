@@ -208,10 +208,10 @@ class _ProgressScreenState extends State<ProgressScreen> with SingleTickerProvid
       color: cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 8,
-      shadowColor: Colors.black.withOpacity(0.5),
+      shadowColor: Colors.black.withOpacity(0.0),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(15),
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -219,7 +219,7 @@ class _ProgressScreenState extends State<ProgressScreen> with SingleTickerProvid
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.all(19),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -240,9 +240,9 @@ class _ProgressScreenState extends State<ProgressScreen> with SingleTickerProvid
               ),
               const SizedBox(height: 20),
               AspectRatio(
-                aspectRatio: 16 / 10,
+                aspectRatio: 16 / 12,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(2),
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator(color: accentColor))
                       : _weightHistory.length < 2

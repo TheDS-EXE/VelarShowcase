@@ -390,7 +390,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     });
   }
 
-  void _loadPersonalBests() async {
+  Future<void> _loadPersonalBests() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _mostSteps = prefs.getInt('mostSteps') ?? 0;
@@ -433,7 +433,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
   }
 
-  void _saveDailyData() async {
+  Future<void> _saveDailyData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_stepsKey, stepsTaken);
     await prefs.setInt(_waterKey, waterIntake);
@@ -480,12 +480,13 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     refreshData();
   }
 
-  void _addWater() {
+  // MODIFIED: Methods are now async to prevent race conditions.
+  void _addWater() async {
     setState(() {
       waterIntake += 1;
     });
-    _saveDailyData();
-    _loadPersonalBests();
+    await _saveDailyData();
+    await _loadPersonalBests();
   }
 
   void _logSleep(int hours) {
@@ -495,13 +496,14 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     _saveDailyData();
   }
 
-  void _addSteps(int newSteps) {
+  // MODIFIED: Methods are now async to prevent race conditions.
+  void _addSteps(int newSteps) async {
     if (newSteps > 0) {
       setState(() {
         stepsTaken += newSteps;
       });
-      _saveDailyData();
-      _loadPersonalBests();
+      await _saveDailyData();
+      await _loadPersonalBests();
     }
   }
 
@@ -526,11 +528,6 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
 
   @override
   Widget build(BuildContext context) {
-    final String calorieBurnFeedback =
-    _getCalorieBurnFeedback(_mostCaloriesBurned);
-    final String stepBestFeedback = _getStepLevelFeedback(_mostSteps);
-    final String waterBestFeedback = _getWaterLevelFeedback(_mostWater);
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
@@ -540,12 +537,8 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
           children: [
             _buildDailySummaryCard(),
             const SizedBox(height: 30),
-            _buildPersonalBestShowcase(
-              stepBestFeedback,
-              calorieBurnFeedback,
-              waterBestFeedback,
-            ),
-            const SizedBox(height: 16),
+            _buildPersonalBestShowcase(),
+            const SizedBox(height: 30),
             _buildStreakHeatmap(),
             const SizedBox(height: 16),
             GlassCard(
@@ -621,7 +614,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
                 onTap: _navigateToCaloriesScreen,
               ),
               _buildMetricBarChart(
-                icon: Icons.directions_walk,
+                icon: Icons.run_circle_outlined,
                 color: kStepsColor,
                 label: "Steps",
                 currentValue: stepsTaken,
@@ -891,36 +884,46 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     );
   }
 
-  // MODIFIED: Personal Best widget to use red theme colors.
-  Widget _buildPersonalBestShowcase(
-      String stepBestFeedback,
-      String calorieBurnFeedback,
-      String waterBestFeedback,
-      ) {
-    // Calculate progress towards personal bests (0.0 to 1.0+)
-    final double stepsProgress = _mostSteps > 0 ? stepsTaken / _mostSteps : 0;
-    final double caloriesBurnedProgress = _mostCaloriesBurned > 0 ? _calculateCaloriesBurned() / _mostCaloriesBurned : 0;
-    final double waterProgress = _mostWater > 0 ? waterIntake / _mostWater : 0;
+  Widget _buildPersonalBestShowcase() {
+    // Logic to handle new records (when the previous best was 0).
+    // If the best record is 0, any new value > 0 is treated as a 100% progress PR.
+    final double stepsProgress = (_mostSteps == 0 && stepsTaken > 0)
+        ? 1.0
+        : (_mostSteps > 0 ? stepsTaken / _mostSteps : 0.0);
+    final int caloriesBurned = _calculateCaloriesBurned();
+    final double caloriesBurnedProgress =
+    (_mostCaloriesBurned == 0 && caloriesBurned > 0)
+        ? 1.0
+        : (_mostCaloriesBurned > 0
+        ? caloriesBurned / _mostCaloriesBurned
+        : 0.0);
+    final double waterProgress = (_mostWater == 0 && waterIntake > 0)
+        ? 1.0
+        : (_mostWater > 0 ? waterIntake / _mostWater : 0.0);
 
     return Column(
       children: [
-        Column(
-          children: [
-            Text(
-              "Chasing Records",
-              style: GoogleFonts.poppins(
-                  fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
-            ),
-            Container(
-              margin: const EdgeInsets.only(top: 4),
-              height: 2,
-              width: 40,
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(2),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "   Chasing Records",
+                style: GoogleFonts.poppins(
+                    fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
               ),
-            )
-          ],
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                height: 2,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              )
+            ],
+          ),
         ),
         const SizedBox(height: 24),
         Row(
@@ -928,19 +931,19 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
           children: [
             PersonalBestCircle(
               progress: stepsProgress,
-              classification: stepBestFeedback,
+              icon: Icons.run_circle_outlined,
               label: "Steps PR",
               gradientColors: const [accentColor, secondaryColor],
             ),
             PersonalBestCircle(
               progress: caloriesBurnedProgress,
-              classification: calorieBurnFeedback,
+              icon: Icons.local_fire_department_outlined,
               label: "Burn PR",
               gradientColors: const [accentColor, secondaryColor],
             ),
             PersonalBestCircle(
               progress: waterProgress,
-              classification: waterBestFeedback,
+              icon: Icons.water_drop_outlined,
               label: "Water PR",
               gradientColors: const [accentColor, secondaryColor],
             ),
@@ -1006,17 +1009,16 @@ class GlassCard extends StatelessWidget {
   }
 }
 
-// MODIFIED: Entirely new implementation for the Personal Best radial progress circles.
 class PersonalBestCircle extends StatefulWidget {
   final double progress;
-  final String classification;
+  final IconData icon;
   final String label;
   final List<Color> gradientColors;
 
   const PersonalBestCircle({
     super.key,
     required this.progress,
-    required this.classification,
+    required this.icon,
     required this.label,
     required this.gradientColors,
   });
@@ -1158,24 +1160,18 @@ class _PersonalBestCircleState extends State<PersonalBestCircle>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    widget.classification,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                  Icon(
+                    widget.icon,
+                    color: Colors.white.withOpacity(0.9),
+                    size: 28,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 8),
                   Text(
                     widget.label,
                     style: GoogleFonts.inter(
-                      color: accentColor,
+                      color: Colors.white,
                       fontSize: 11,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
@@ -1188,7 +1184,6 @@ class _PersonalBestCircleState extends State<PersonalBestCircle>
   }
 }
 
-// MODIFIED: Custom painter with gold ring, shimmer, and red glow effects.
 class _PersonalBestPainter extends CustomPainter {
   final double progress;
   final double pulseValue;
