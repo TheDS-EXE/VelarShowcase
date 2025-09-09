@@ -1,5 +1,5 @@
 // lib/main.dart
-// test
+//test github
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -910,7 +910,7 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "   Chasing Records",
+                "  Chasing Records",
                 style: GoogleFonts.poppins(
                     fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
               ),
@@ -1261,40 +1261,51 @@ class _PersonalBestPainter extends CustomPainter {
     } else {
       // --- State: PR Achieved (>= 100%) ---
 
-      // Interpolate from red to gold during the transition animation
+      // Create a seamless list of gold colors for a smooth gradient loop
+      final List<Color> seamlessGold = [
+        _goldColors[0],
+        _goldColors[1],
+        _goldColors[2],
+        _goldColors[0], // Repeat the first color to close the loop
+      ];
+
+      // Interpolate from the red gradient to the gold gradient during the transition
       final List<Color> currentRingColors = List.generate(
-        gradientColors.length,
-            (i) => Color.lerp(gradientColors[i], _goldColors[i % _goldColors.length], goldTransitionValue)!,
+        seamlessGold.length,
+            (i) => Color.lerp(gradientColors[i % gradientColors.length], seamlessGold[i], goldTransitionValue)!,
       );
 
-      // Soft Gold Glow
+      // Soft Gold Glow - made slightly more prominent
       final goldGlowPaint = Paint()
-        ..color = currentRingColors.first.withOpacity(0.5)
+        ..color = currentRingColors.first.withOpacity(0.7) // Increased opacity
         ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth + 4
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+        ..strokeWidth = strokeWidth + 6 // Increased width
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8); // Increased blur
       canvas.drawCircle(center, radius, goldGlowPaint);
 
-
-      // Gold Gradient Ring
+      // Gold Gradient Ring - now seamless
       final goldRingPaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.round
-        ..shader = ui.Gradient.sweep(center, currentRingColors);
+        ..shader = ui.Gradient.sweep(
+          center,
+          currentRingColors, // Using the new seamless color list
+          // Define color stops for even distribution
+          List.generate(currentRingColors.length, (index) => index / (currentRingColors.length - 1)),
+        );
       canvas.drawCircle(center, radius, goldRingPaint);
 
-
-      // Shimmer Sweep Effect
+      // Shimmer Sweep Effect - made more prominent
       final shimmerPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth + 0.5
+        ..strokeWidth = strokeWidth + 1.0 // Made slightly thicker to feel integrated
         ..strokeCap = StrokeCap.round
         ..shader = ui.Gradient.sweep(
           center,
-          [Colors.transparent, Colors.white.withOpacity(0.4), Colors.transparent],
-          [0.0, 0.2, 0.4], // colorStops
-          TileMode.clamp, // tileMode
+          [Colors.transparent, Colors.white.withOpacity(0.8), Colors.transparent], // Increased opacity
+          [0.0, 0.1, 0.2], // Tighter stops for a sharper "spark"
+          TileMode.clamp,
           shimmerValue, // startAngle
           shimmerValue + (pi / 2), // endAngle
         );

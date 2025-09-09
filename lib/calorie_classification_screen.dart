@@ -1157,7 +1157,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
           margin: const EdgeInsets.symmetric(vertical: 4),
           child: ListTile(
             title: Text(entry['name'], style: GoogleFonts.inter(color: textColor)),
-            subtitle: Text("${entry['calories']} cal - ${entry['classification']}",
+            subtitle: Text("${entry['classification']}",
                 style: GoogleFonts.inter(color: textColor.withOpacity(0.7))),
             trailing: Text(
               "${entry['quantity']}x ${entry['servingSize']}",

@@ -380,46 +380,45 @@ class _WeightGraphPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (weightHistory.length < 2) return;
 
+    // --- MODIFICATION START: Add padding and adjust drawable area ---
+    const double topPadding = 20.0;
+    const double bottomPadding = 20.0; // For date labels
+    const double horizontalPadding = 5.0; // Minimal horizontal padding
+
+    final double drawableHeight = size.height - topPadding - bottomPadding;
+    final double drawableWidth = size.width - (2 * horizontalPadding);
+
+    // Stop painting if the canvas is too small to avoid errors.
+    if (drawableHeight <= 0 || drawableWidth <= 0) return;
+    // --- MODIFICATION END ---
+
     weightHistory.sort((a, b) => a.date.compareTo(b.date));
 
-    // --- MODIFICATION START: Smarter logic for calculating graph labels ---
-
-    // 1. Find the true min and max from the data.
+    // --- Smarter logic for calculating graph labels ---
     double minDataWeight = weightHistory.map((e) => e.weight).reduce(min);
     double maxDataWeight = weightHistory.map((e) => e.weight).reduce(max);
-
-    // 2. Define a target for how many lines we want, to avoid clutter.
     const int maxHorizontalLines = 3;
-
-    // 3. Calculate "nice" (rounded) top and bottom boundaries for the graph.
-    double interval = 5.0; // Start with a default nice interval.
+    double interval = 5.0;
     double niceMinWeight = (minDataWeight / interval).floor() * interval;
     double niceMaxWeight = (maxDataWeight / interval).ceil() * interval;
 
-    // 4. Dynamically increase the interval if it creates too many lines.
-    // This ensures the graph is never cluttered, even with a large weight range.
     while (((niceMaxWeight - niceMinWeight) / interval).floor() > maxHorizontalLines) {
-      interval *= 2; // e.g., 5kg becomes 10kg, then 20kg, etc.
+      interval *= 2;
     }
-
-    // Recalculate boundaries with the potentially larger interval
     niceMinWeight = (minDataWeight / interval).floor() * interval;
     niceMaxWeight = (maxDataWeight / interval).ceil() * interval;
 
-
-    // 5. Handle edge cases where all data points are very close.
     if (niceMinWeight == niceMaxWeight) {
       niceMaxWeight += interval;
     }
     double niceRange = niceMaxWeight - niceMinWeight;
     if (niceRange <= 0) niceRange = 1;
 
-    // --- MODIFICATION END ---
-
     final points = <Offset>[];
     for (int i = 0; i < weightHistory.length; i++) {
-      final x = size.width * (i / (weightHistory.length - 1));
-      final y = size.height - ((weightHistory[i].weight - niceMinWeight) / niceRange) * size.height;
+      // --- MODIFICATION: Use drawable area and padding for coordinates ---
+      final x = horizontalPadding + drawableWidth * (i / (weightHistory.length - 1));
+      final y = topPadding + (drawableHeight - ((weightHistory[i].weight - niceMinWeight) / niceRange) * drawableHeight);
       points.add(Offset(x, y));
     }
 
@@ -428,11 +427,10 @@ class _WeightGraphPainter extends CustomPainter {
       ..strokeWidth = 0.8
       ..style = PaintingStyle.stroke;
 
-    // Use the final dynamic interval to draw the grid lines and labels.
     for (double labelValue = niceMinWeight; labelValue <= niceMaxWeight; labelValue += interval) {
       if (labelValue == niceMinWeight) continue;
-
-      final y = size.height - ((labelValue - niceMinWeight) / niceRange) * size.height;
+      // --- MODIFICATION: Calculate Y position using padded drawable area ---
+      final y = topPadding + (drawableHeight - ((labelValue - niceMinWeight) / niceRange) * drawableHeight);
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
 
       final textSpan = TextSpan(
@@ -450,13 +448,14 @@ class _WeightGraphPainter extends CustomPainter {
 
       for (final index in indicesToShow) {
         final entry = weightHistory[index];
-        final x = size.width * (index / (weightHistory.length - 1));
+        final x = horizontalPadding + drawableWidth * (index / (weightHistory.length - 1));
         final formattedDate = '${entry.date.day}/${entry.date.month}';
         final textSpan = TextSpan(text: formattedDate, style: dateTextStyle);
         final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
         textPainter.layout();
         final labelX = (x - textPainter.width / 2).clamp(0.0, size.width - textPainter.width);
-        textPainter.paint(canvas, Offset(labelX, size.height + 4));
+        // --- MODIFICATION: Paint inside the canvas using bottom padding ---
+        textPainter.paint(canvas, Offset(labelX, size.height - bottomPadding + 4));
       }
     }
 
@@ -505,11 +504,12 @@ class _WeightGraphPainter extends CustomPainter {
     canvas.drawPath(animatedPath, glowPaint);
     canvas.drawPath(animatedPath, linePaint);
 
+    // This section needs to iterate over the calculated `points`, not create new ones.
     for (int i = 0; i < points.length; i++) {
       final point = points[i];
-      final pointProgress = (i / (points.length - 1)) * animationValue;
-
-      if (pointProgress <= 1.0) {
+      // The progress should be calculated based on the animation value, not re-invented.
+      final pathProgressForPoint = (i / (points.length - 1));
+      if (animationValue >= pathProgressForPoint) {
         canvas.drawCircle(point, 5, pointPaint);
         canvas.drawCircle(point, 2.5, Paint()..color = Colors.white);
       }
