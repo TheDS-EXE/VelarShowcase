@@ -1,5 +1,4 @@
 // lib/main.dart
-//test github
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -16,6 +15,7 @@ import 'calorie_classification_screen.dart';
 import 'goals_screen.dart';
 import 'login_screen.dart';
 import 'progress_screen.dart';
+import 'workouts_screen.dart';
 
 // --- Constants ---
 const double kPi = 3.1415926535897932;
@@ -59,7 +59,16 @@ class NutritionTrackerApp extends StatelessWidget {
     return MaterialApp(
       title: 'Nutrition & Steps Tracker',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.pinkAccent),
+        // THIS IS THE CRITICAL FIX:
+        // By setting the global scaffold background to transparent, we allow
+        // the gradient in HomeScreen to be visible on all child pages.
+        scaffoldBackgroundColor: Colors.transparent,
+
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.pinkAccent,
+          // Important for some components to also have a transparent background
+          background: Colors.transparent,
+        ),
         useMaterial3: true,
       ),
       home: rememberMe ? const HomeScreen() : const LoginScreen(),
@@ -100,8 +109,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       const ProgressScreen(),
       const GoalsScreen(),
+      const WorkoutsScreen(),
     ];
 
+    // This Container provides the gradient background for the entire app.
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -111,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       child: Scaffold(
+        // The scaffold itself is transparent to show the container's gradient.
         backgroundColor: Colors.transparent,
         body: Column(
           children: [
@@ -164,8 +176,9 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildNavItem(index: 0, icon: Icons.dashboard, label: "Home"),
           _buildNavItem(index: 1, icon: Icons.restaurant, label: "Food"),
+          _buildNavItem(index: 4, icon: Icons.fitness_center, label: "Workouts"),
           _buildNavItem(index: 2, icon: Icons.bar_chart, label: "Progress"),
-          _buildNavItem(index: 3, icon: Icons.flag, label: "Goals"),
+
         ],
       ),
     );
@@ -481,7 +494,6 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     refreshData();
   }
 
-  // MODIFIED: Methods are now async to prevent race conditions.
   void _addWater() async {
     setState(() {
       waterIntake += 1;
@@ -497,7 +509,6 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     _saveDailyData();
   }
 
-  // MODIFIED: Methods are now async to prevent race conditions.
   void _addSteps(int newSteps) async {
     if (newSteps > 0) {
       setState(() {
@@ -886,8 +897,6 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
   }
 
   Widget _buildPersonalBestShowcase() {
-    // Logic to handle new records (when the previous best was 0).
-    // If the best record is 0, any new value > 0 is treated as a 100% progress PR.
     final double stepsProgress = (_mostSteps == 0 && stepsTaken > 0)
         ? 1.0
         : (_mostSteps > 0 ? stepsTaken / _mostSteps : 0.0);
@@ -1045,7 +1054,6 @@ class _PersonalBestCircleState extends State<PersonalBestCircle>
   @override
   void initState() {
     super.initState();
-    // Controller for the main progress arc animation
     _progressController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -1057,7 +1065,6 @@ class _PersonalBestCircleState extends State<PersonalBestCircle>
               parent: _progressController, curve: Curves.easeInOutCubic),
         );
 
-    // Controller for the pulsing glow effect when nearing a PR
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
@@ -1066,7 +1073,6 @@ class _PersonalBestCircleState extends State<PersonalBestCircle>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // Controller for the red-to-gold transition animation
     _goldTransitionController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -1076,7 +1082,6 @@ class _PersonalBestCircleState extends State<PersonalBestCircle>
           parent: _goldTransitionController, curve: Curves.easeIn),
     );
 
-    // Controller for the shimmering metallic sweep effect on the gold ring
     _shimmerController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -1212,7 +1217,6 @@ class _PersonalBestPainter extends CustomPainter {
     final radius = size.width / 2 - 4;
     const strokeWidth = 5.0;
 
-    // Background track
     final trackPaint = Paint()
       ..color = Colors.white.withOpacity(0.1)
       ..style = PaintingStyle.stroke
@@ -1220,9 +1224,6 @@ class _PersonalBestPainter extends CustomPainter {
     canvas.drawCircle(center, radius, trackPaint);
 
     if (progress < 1.0) {
-      // --- State: Normal Progress (< 90%) or Nearing PR (>= 90%) ---
-
-      // Pulsing Glow when nearing PR
       if (progress >= 0.9) {
         final glowPaint = Paint()
           ..color = gradientColors.first
@@ -1238,19 +1239,22 @@ class _PersonalBestPainter extends CustomPainter {
         );
       }
 
-      // Red Progress Arc
+      final seamlessGradientColors = [...gradientColors, gradientColors.first];
+      final colorStops = List.generate(seamlessGradientColors.length, (i) => i / (seamlessGradientColors.length - 1));
+
       final progressPaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.round
         ..shader = ui.Gradient.sweep(
           center,
-          gradientColors,
-          null, // colorStops
-          TileMode.clamp, // tileMode
-          -pi / 2, // startAngle
-          -pi / 2 + (2 * pi * progress), // endAngle
+          seamlessGradientColors,
+          colorStops,
+          TileMode.clamp,
+          -pi / 2,
+          -pi / 2 + (2 * pi),
         );
+
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
         -pi / 2,
@@ -1259,60 +1263,52 @@ class _PersonalBestPainter extends CustomPainter {
         progressPaint,
       );
     } else {
-      // --- State: PR Achieved (>= 100%) ---
-
-      // Create a seamless list of gold colors for a smooth gradient loop
       final List<Color> seamlessGold = [
         _goldColors[0],
         _goldColors[1],
         _goldColors[2],
-        _goldColors[0], // Repeat the first color to close the loop
+        _goldColors[0],
       ];
 
-      // Interpolate from the red gradient to the gold gradient during the transition
       final List<Color> currentRingColors = List.generate(
         seamlessGold.length,
             (i) => Color.lerp(gradientColors[i % gradientColors.length], seamlessGold[i], goldTransitionValue)!,
       );
 
-      // Soft Gold Glow - made slightly more prominent
       final goldGlowPaint = Paint()
-        ..color = currentRingColors.first.withOpacity(0.7) // Increased opacity
+        ..color = currentRingColors.first.withOpacity(0.7)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth + 6 // Increased width
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8); // Increased blur
+        ..strokeWidth = strokeWidth + 6
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
       canvas.drawCircle(center, radius, goldGlowPaint);
 
-      // Gold Gradient Ring - now seamless
       final goldRingPaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.round
         ..shader = ui.Gradient.sweep(
           center,
-          currentRingColors, // Using the new seamless color list
-          // Define color stops for even distribution
+          currentRingColors,
           List.generate(currentRingColors.length, (index) => index / (currentRingColors.length - 1)),
         );
       canvas.drawCircle(center, radius, goldRingPaint);
 
-      // Shimmer Sweep Effect - made more prominent
       final shimmerPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth + 1.0 // Made slightly thicker to feel integrated
+        ..strokeWidth = strokeWidth + 1.0
         ..strokeCap = StrokeCap.round
         ..shader = ui.Gradient.sweep(
           center,
-          [Colors.transparent, Colors.white.withOpacity(0.8), Colors.transparent], // Increased opacity
-          [0.0, 0.1, 0.2], // Tighter stops for a sharper "spark"
+          [Colors.transparent, Colors.white.withOpacity(0.8), Colors.transparent],
+          [0.0, 0.1, 0.2],
           TileMode.clamp,
-          shimmerValue, // startAngle
-          shimmerValue + (pi / 2), // endAngle
+          shimmerValue,
+          shimmerValue + (pi / 2),
         );
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
         -pi / 2,
-        2 * pi, // Full circle
+        2 * pi,
         false,
         shimmerPaint,
       );
@@ -1321,7 +1317,6 @@ class _PersonalBestPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_PersonalBestPainter oldDelegate) {
-    // Repaint whenever any animated value changes
     return progress != oldDelegate.progress ||
         pulseValue != oldDelegate.pulseValue ||
         goldTransitionValue != oldDelegate.goldTransitionValue ||
@@ -1332,9 +1327,7 @@ class _PersonalBestPainter extends CustomPainter {
 
 class UltraSleekSleepDialog extends StatefulWidget {
   final ValueChanged<int> onSleepLogged;
-
   const UltraSleekSleepDialog({super.key, required this.onSleepLogged});
-
   @override
   State<UltraSleekSleepDialog> createState() => _UltraSleekSleepDialogState();
 }
@@ -1350,22 +1343,10 @@ class _UltraSleekSleepDialogState extends State<UltraSleekSleepDialog>
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 350),
-      vsync: this,
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
-    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
-    );
-
+    _fadeController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
+    _scaleController = AnimationController(duration: const Duration(milliseconds: 350), vsync: this);
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut));
     _fadeController.forward();
     _scaleController.forward();
   }
@@ -1389,18 +1370,7 @@ class _UltraSleekSleepDialogState extends State<UltraSleekSleepDialog>
               scale: _scaleAnimation.value,
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 40),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1C1C1E),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.8),
-                      blurRadius: 30,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
+                decoration: BoxDecoration(color: const Color(0xFF1C1C1E), borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 30, spreadRadius: 0, offset: const Offset(0, 10))]),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1408,34 +1378,14 @@ class _UltraSleekSleepDialogState extends State<UltraSleekSleepDialog>
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                       child: Column(
                         children: [
-                          Icon(
-                            Icons.bedtime_outlined,
-                            color: const Color(0xFF007AFF),
-                            size: 32,
-                          ),
+                          const Icon(Icons.bedtime_outlined, color: Color(0xFF007AFF), size: 32),
                           const SizedBox(height: 12),
-                          Text(
-                            "Sleep Duration",
-                            style: GoogleFonts.inter(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
+                          Text("Sleep Duration", style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w600, color: Colors.white, letterSpacing: -0.5)),
                           const SizedBox(height: 6),
-                          Text(
-                            "How many hours did you sleep?",
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              color: Colors.white.withOpacity(0.6),
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
+                          Text("How many hours did you sleep?", style: GoogleFonts.inter(fontSize: 15, color: Colors.white.withOpacity(0.6), fontWeight: FontWeight.w400)),
                         ],
                       ),
                     ),
-
                     Container(
                       height: 180,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1446,14 +1396,7 @@ class _UltraSleekSleepDialogState extends State<UltraSleekSleepDialog>
                             height: 60,
                             width: double.infinity,
                             margin: const EdgeInsets.symmetric(horizontal: 20),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF007AFF).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFF007AFF).withOpacity(0.3),
-                                width: 1,
-                              ),
-                            ),
+                            decoration: BoxDecoration(color: const Color(0xFF007AFF).withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF007AFF).withOpacity(0.3), width: 1)),
                           ),
                           ListWheelScrollView.useDelegate(
                             itemExtent: 60,
@@ -1461,9 +1404,7 @@ class _UltraSleekSleepDialogState extends State<UltraSleekSleepDialog>
                             diameterRatio: 1.5,
                             physics: const FixedExtentScrollPhysics(),
                             onSelectedItemChanged: (index) {
-                              setState(() {
-                                _selectedHours = index + 1;
-                              });
+                              setState(() => _selectedHours = index + 1);
                               HapticFeedback.selectionClick();
                             },
                             childDelegate: ListWheelChildBuilderDelegate(
@@ -1471,7 +1412,6 @@ class _UltraSleekSleepDialogState extends State<UltraSleekSleepDialog>
                               builder: (context, index) {
                                 final hour = index + 1;
                                 final isSelected = _selectedHours == hour;
-
                                 return AnimatedContainer(
                                   duration: const Duration(milliseconds: 200),
                                   curve: Curves.easeOut,
@@ -1481,28 +1421,9 @@ class _UltraSleekSleepDialogState extends State<UltraSleekSleepDialog>
                                       crossAxisAlignment: CrossAxisAlignment.baseline,
                                       textBaseline: TextBaseline.alphabetic,
                                       children: [
-                                        Text(
-                                          hour.toString(),
-                                          style: GoogleFonts.inter(
-                                            fontSize: isSelected ? 34 : 24,
-                                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                            color: isSelected
-                                                ? Colors.white
-                                                : Colors.white.withOpacity(0.4),
-                                            height: 1.0,
-                                          ),
-                                        ),
+                                        Text(hour.toString(), style: GoogleFonts.inter(fontSize: isSelected ? 34 : 24, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? Colors.white : Colors.white.withOpacity(0.4), height: 1.0)),
                                         const SizedBox(width: 8),
-                                        Text(
-                                          hour == 1 ? "hour" : "hours",
-                                          style: GoogleFonts.inter(
-                                            fontSize: isSelected ? 16 : 14,
-                                            fontWeight: FontWeight.w400,
-                                            color: isSelected
-                                                ? Colors.white.withOpacity(0.8)
-                                                : Colors.white.withOpacity(0.3),
-                                          ),
-                                        ),
+                                        Text(hour == 1 ? "hour" : "hours", style: GoogleFonts.inter(fontSize: isSelected ? 16 : 14, fontWeight: FontWeight.w400, color: isSelected ? Colors.white.withOpacity(0.8) : Colors.white.withOpacity(0.3))),
                                       ],
                                     ),
                                   ),
@@ -1513,86 +1434,25 @@ class _UltraSleekSleepDialogState extends State<UltraSleekSleepDialog>
                         ],
                       ),
                     ),
-
                     Container(
                       padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
                       child: Column(
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _getSleepQualityColor(_selectedHours).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: _getSleepQualityColor(_selectedHours).withOpacity(0.4),
-                                width: 1,
-                              ),
-                            ),
-                            child: Text(
-                              _getSleepQualityFeedback(_selectedHours),
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: _getSleepQualityColor(_selectedHours),
-                              ),
-                            ),
+                            decoration: BoxDecoration(color: _getSleepQualityColor(_selectedHours).withOpacity(0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: _getSleepQualityColor(_selectedHours).withOpacity(0.4), width: 1)),
+                            child: Text(_getSleepQualityFeedback(_selectedHours), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: _getSleepQualityColor(_selectedHours))),
                           ),
                         ],
                       ),
                     ),
-
                     Container(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                       child: Row(
                         children: [
-                          Expanded(
-                            child: TextButton(
-                              onPressed: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.pop(context);
-                              },
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                "Cancel",
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white.withOpacity(0.6),
-                                ),
-                              ),
-                            ),
-                          ),
+                          Expanded(child: TextButton(onPressed: () { HapticFeedback.lightImpact(); Navigator.pop(context); }, style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: Text("Cancel", style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.6))))),
                           const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                HapticFeedback.mediumImpact();
-                                widget.onSleepLogged(_selectedHours);
-                                Navigator.pop(context);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF007AFF),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: Text(
-                                "Log Sleep",
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
+                          Expanded(child: ElevatedButton(onPressed: () { HapticFeedback.mediumImpact(); widget.onSleepLogged(_selectedHours); Navigator.pop(context); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007AFF), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: Text("Log Sleep", style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600)))),
                         ],
                       ),
                     ),
@@ -1629,9 +1489,7 @@ class _UltraSleekSleepDialogState extends State<UltraSleekSleepDialog>
 
 class UltraSleekStepsDialog extends StatefulWidget {
   final ValueChanged<int> onStepsLogged;
-
   const UltraSleekStepsDialog({super.key, required this.onStepsLogged});
-
   @override
   State<UltraSleekStepsDialog> createState() => _UltraSleekStepsDialogState();
 }
@@ -1649,22 +1507,10 @@ class _UltraSleekStepsDialogState extends State<UltraSleekStepsDialog>
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 350),
-      vsync: this,
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
-    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
-    );
-
+    _fadeController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
+    _scaleController = AnimationController(duration: const Duration(milliseconds: 350), vsync: this);
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut));
     _fadeController.forward();
     _scaleController.forward();
   }
@@ -1711,16 +1557,7 @@ class _UltraSleekStepsDialogState extends State<UltraSleekStepsDialog>
               scale: _scaleAnimation.value,
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 40),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1C1C1E),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.8),
-                      blurRadius: 30,
-                    ),
-                  ],
-                ),
+                decoration: BoxDecoration(color: const Color(0xFF1C1C1E), borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 30)]),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1728,28 +1565,11 @@ class _UltraSleekStepsDialogState extends State<UltraSleekStepsDialog>
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                       child: Column(
                         children: [
-                          Icon(
-                            Icons.timer_outlined,
-                            color: accent,
-                            size: 32,
-                          ),
+                          Icon(Icons.timer_outlined, color: accent, size: 32),
                           const SizedBox(height: 12),
-                          Text(
-                            "Activity Duration",
-                            style: GoogleFonts.inter(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
+                          Text("Activity Duration", style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w600, color: Colors.white)),
                           const SizedBox(height: 6),
-                          Text(
-                            "How many minutes did you walk?",
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              color: Colors.white.withOpacity(0.6),
-                            ),
-                          ),
+                          Text("How many minutes did you walk?", style: GoogleFonts.inter(fontSize: 15, color: Colors.white.withOpacity(0.6))),
                         ],
                       ),
                     ),
@@ -1763,14 +1583,7 @@ class _UltraSleekStepsDialogState extends State<UltraSleekStepsDialog>
                             height: 60,
                             width: double.infinity,
                             margin: const EdgeInsets.symmetric(horizontal: 20),
-                            decoration: BoxDecoration(
-                              color: accent.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: accent.withOpacity(0.3),
-                                width: 1,
-                              ),
-                            ),
+                            decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: accent.withOpacity(0.3), width: 1)),
                           ),
                           ListWheelScrollView.useDelegate(
                             controller: FixedExtentScrollController(initialItem: _selectedMinutes -1),
@@ -1779,9 +1592,7 @@ class _UltraSleekStepsDialogState extends State<UltraSleekStepsDialog>
                             diameterRatio: 1.5,
                             physics: const FixedExtentScrollPhysics(),
                             onSelectedItemChanged: (index) {
-                              setState(() {
-                                _selectedMinutes = index + 1;
-                              });
+                              setState(() => _selectedMinutes = index + 1);
                               HapticFeedback.selectionClick();
                             },
                             childDelegate: ListWheelChildBuilderDelegate(
@@ -1789,30 +1600,15 @@ class _UltraSleekStepsDialogState extends State<UltraSleekStepsDialog>
                               builder: (context, index) {
                                 final minute = index + 1;
                                 final isSelected = _selectedMinutes == minute;
-
                                 return Center(
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     crossAxisAlignment: CrossAxisAlignment.baseline,
                                     textBaseline: TextBaseline.alphabetic,
                                     children: [
-                                      Text(
-                                        minute.toString(),
-                                        style: GoogleFonts.inter(
-                                          fontSize: isSelected ? 34 : 24,
-                                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                          color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
-                                        ),
-                                      ),
+                                      Text(minute.toString(), style: GoogleFonts.inter(fontSize: isSelected ? 34 : 24, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? Colors.white : Colors.white.withOpacity(0.4))),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        "min",
-                                        style: GoogleFonts.inter(
-                                          fontSize: isSelected ? 16 : 14,
-                                          fontWeight: FontWeight.w400,
-                                          color: isSelected ? Colors.white.withOpacity(0.8) : Colors.white.withOpacity(0.3),
-                                        ),
-                                      ),
+                                      Text("min", style: GoogleFonts.inter(fontSize: isSelected ? 16 : 14, fontWeight: FontWeight.w400, color: isSelected ? Colors.white.withOpacity(0.8) : Colors.white.withOpacity(0.3))),
                                     ],
                                   ),
                                 );
@@ -1828,22 +1624,8 @@ class _UltraSleekStepsDialogState extends State<UltraSleekStepsDialog>
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _getWalkIntensityColor(_selectedMinutes).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: _getWalkIntensityColor(_selectedMinutes).withOpacity(0.4),
-                                width: 1,
-                              ),
-                            ),
-                            child: Text(
-                              "${_getWalkIntensityFeedback(_selectedMinutes)}  •  ~$calculatedSteps steps",
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: _getWalkIntensityColor(_selectedMinutes),
-                              ),
-                            ),
+                            decoration: BoxDecoration(color: _getWalkIntensityColor(_selectedMinutes).withOpacity(0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: _getWalkIntensityColor(_selectedMinutes).withOpacity(0.4), width: 1)),
+                            child: Text("${_getWalkIntensityFeedback(_selectedMinutes)}  •  ~$calculatedSteps steps", style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: _getWalkIntensityColor(_selectedMinutes))),
                           ),
                         ],
                       ),
@@ -1852,45 +1634,9 @@ class _UltraSleekStepsDialogState extends State<UltraSleekStepsDialog>
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                       child: Row(
                         children: [
-                          Expanded(
-                            child: TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: Text(
-                                "Cancel",
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white.withOpacity(0.6),
-                                ),
-                              ),
-                            ),
-                          ),
+                          Expanded(child: TextButton(onPressed: () => Navigator.pop(context), child: Text("Cancel", style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.6))))),
                           const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                HapticFeedback.mediumImpact();
-                                widget.onStepsLogged(calculatedSteps);
-                                Navigator.pop(context);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: accent,
-                                foregroundColor: Colors.black.withOpacity(0.7),
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: Text(
-                                "Log Activity",
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
+                          Expanded(child: ElevatedButton(onPressed: () { HapticFeedback.mediumImpact(); widget.onStepsLogged(calculatedSteps); Navigator.pop(context); }, style: ElevatedButton.styleFrom(backgroundColor: accent, foregroundColor: Colors.black.withOpacity(0.7), padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0), child: Text("Log Activity", style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600)))),
                         ],
                       ),
                     ),

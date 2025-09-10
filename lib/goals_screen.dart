@@ -202,62 +202,64 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     }
   }
 
-  // MODIFICATION: Removed the Scaffold and SafeArea to integrate with main.dart's structure.
-  // The root widget is now the SingleChildScrollView.
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildSectionTitle("What's Your Goal?"),
-          const SizedBox(height: 16),
-          _buildGoalSelection(),
-          const SizedBox(height: 32),
+    // MODIFIED: This screen is now a Scaffold with a transparent background
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildSectionTitle("What's Your Goal?"),
+            const SizedBox(height: 16),
+            _buildGoalSelection(),
+            const SizedBox(height: 32),
 
-          _buildSectionTitle("Select Your Gender"),
-          const SizedBox(height: 16),
-          _buildGenderSelection(),
-          const SizedBox(height: 32),
+            _buildSectionTitle("Select Your Gender"),
+            const SizedBox(height: 16),
+            _buildGenderSelection(),
+            const SizedBox(height: 32),
 
-          _buildSectionTitle("Tell Us About Yourself"),
-          const SizedBox(height: 24),
-          _buildStatSlider(
-            title: "Age",
-            value: _currentAge,
-            minValue: 10,
-            maxValue: 100,
-            onChanged: (value) {
-              setState(() => _currentAge = value);
-              _saveInt("user_age", value);
-            },
-          ),
-          const SizedBox(height: 20),
-          _buildStatSlider(
-            title: "Height",
-            value: _currentHeight,
-            minValue: 100,
-            maxValue: 250,
-            suffix: " cm",
-            onChanged: (value) {
-              setState(() => _currentHeight = value);
-              _saveInt("userHeight", value);
-            },
-          ),
-          const SizedBox(height: 20),
-          _buildStatSlider(
-            title: "Current Weight",
-            value: _currentWeight,
-            minValue: 30,
-            maxValue: 200,
-            suffix: " kg",
-            onChanged: (value) => setState(() => _currentWeight = value),
-          ),
-          const SizedBox(height: 50),
+            _buildSectionTitle("Tell Us About Yourself"),
+            const SizedBox(height: 24),
+            _buildStatSlider(
+              title: "Age",
+              value: _currentAge,
+              minValue: 10,
+              maxValue: 100,
+              onChanged: (value) {
+                setState(() => _currentAge = value);
+                _saveInt("user_age", value);
+              },
+            ),
+            const SizedBox(height: 20),
+            _buildStatSlider(
+              title: "Height",
+              value: _currentHeight,
+              minValue: 100,
+              maxValue: 250,
+              suffix: " cm",
+              onChanged: (value) {
+                setState(() => _currentHeight = value);
+                _saveInt("userHeight", value);
+              },
+            ),
+            const SizedBox(height: 20),
+            _buildStatSlider(
+              title: "Current Weight",
+              value: _currentWeight,
+              minValue: 30,
+              maxValue: 200,
+              suffix: " kg",
+              onChanged: (value) => setState(() => _currentWeight = value),
+            ),
+            const SizedBox(height: 50),
 
-          _buildContinueButton(),
-        ],
+            _buildContinueButton(),
+          ],
+        ),
       ),
     );
   }

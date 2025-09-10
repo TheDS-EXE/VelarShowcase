@@ -42,6 +42,9 @@ dependencies:
   flutter_neumorphic: ^3.2.0
   flutter_neumorphic_plus: ^3.5.0
   flutter_launcher_icons: ^0.14.4
+  lottie: ^3.3.1
+  flutter_staggered_animations: ^1.1.1
+
 syncfusion_flutter_charts:
   git:
     url: https://github.com/syncfusion/flutter-examples
@@ -87,6 +90,7 @@ flutter:
      - images/Dark wavy lines abstract background.mp4
      - images/Screenshot 2025-08-21 220007.png
      - images/pexels-edward-jenner-4253269.jpg
+     - images/Complete.json
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

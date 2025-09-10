@@ -35,7 +35,6 @@ class CalorieClassificationScreen extends StatefulWidget {
   State<CalorieClassificationScreen> createState() => _CalorieClassificationScreenState();
 }
 
-// MODIFICATION: Added WidgetsBindingObserver to detect when the app is resumed.
 class _CalorieClassificationScreenState extends State<CalorieClassificationScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   final Map<String, TextEditingController> _foodNameControllers = {
     'Breakfast': TextEditingController(),
@@ -54,24 +53,22 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   String _selectedServingSize = 'Standard';
   int _quantity = 1;
 
-  // This now holds the goal loaded from storage, which is calculated on the GoalsScreen.
+  // NEW: State to track if the user has ever set a goal
+  bool _hasSetGoal = false;
+
   int _currentCalorieGoal = 2000;
 
   DateTime _selectedDate = DateTime.now();
   final Map<String, List<Map<String, dynamic>>> _diaryEntries = {};
   final Map<String, int> _diaryCalories = {};
 
-  // Page controller for the meal carousel
   late PageController _pageController;
   double _currentPageValue = 0.0;
   final List<String> _mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
-
   late AnimationController _progressAnimationController;
   late Animation<double> _progressAnimation;
   late AnimationController _streakAnimationController;
-
-  int _activeDayStreak = 5; // Example streak value
 
   final Map<String, double> _servingSizes = {
     'Small': 0.7,
@@ -99,47 +96,26 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   @override
   void initState() {
     super.initState();
-
-    // MODIFICATION: Register this class as an observer for app lifecycle events.
     WidgetsBinding.instance.addObserver(this);
 
     _pageController = PageController(viewportFraction: 0.75);
     _pageController.addListener(() {
-      if (mounted) {
-        setState(() {
-          _currentPageValue = _pageController.page!;
-        });
-      }
+      if (mounted) setState(() => _currentPageValue = _pageController.page!);
     });
 
-    _progressAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-
-    _streakAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-
-    _progressAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _progressAnimationController,
-        curve: Curves.easeOut,
-      ),
-    );
+    _progressAnimationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
+    _streakAnimationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))..repeat(reverse: true);
+    _progressAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _progressAnimationController, curve: Curves.easeOut));
 
     _loadAllData();
   }
 
-  // MODIFICATION: This new method is called when the app's state changes.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    // When the user returns to the app, we reload the calorie goal to ensure
-    // it reflects any changes made on the Goals screen.
     if (state == AppLifecycleState.resumed) {
       _loadCalorieGoal();
+      _checkIfGoalIsSet(); // Also re-check goal status
     }
   }
 
@@ -150,22 +126,29 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   }
 
   Future<void> _loadAllData() async {
+    await _checkIfGoalIsSet();
     await _loadCalorieGoal();
     await _loadSavedData();
     await _checkBmiStatus();
     _progressAnimationController.forward();
   }
 
-  // MODIFICATION: This function now ensures the UI and animations update
-  // whenever a new calorie goal is loaded from storage.
+  // NEW: Checks SharedPreferences to see if a goal has been saved
+  Future<void> _checkIfGoalIsSet() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _hasSetGoal = prefs.containsKey('user_goal');
+      });
+    }
+  }
+
   Future<void> _loadCalorieGoal() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        // This is the key fix: It loads the 'finalCalorieGoal' saved from the GoalsScreen.
         _currentCalorieGoal = prefs.getInt('finalCalorieGoal') ?? widget.calorieGoal;
       });
-      // Restart the progress animation to visually reflect the updated goal.
       _progressAnimationController.forward(from: 0.0);
     }
   }
@@ -183,14 +166,10 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
             _diaryCalories.clear();
 
             final Map<String, dynamic> diaryEntriesMap = decodedData['diaryEntries'] ?? {};
-            diaryEntriesMap.forEach((key, value) {
-              _diaryEntries[key] = List<Map<String, dynamic>>.from(value);
-            });
+            diaryEntriesMap.forEach((key, value) => _diaryEntries[key] = List<Map<String, dynamic>>.from(value));
 
             final Map<String, dynamic> diaryCaloriesMap = decodedData['diaryCalories'] ?? {};
-            diaryCaloriesMap.forEach((key, value) {
-              _diaryCalories[key] = value as int;
-            });
+            diaryCaloriesMap.forEach((key, value) => _diaryCalories[key] = value as int);
           });
         }
       }
@@ -206,10 +185,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
       await prefs.remove('foodEntries');
       await prefs.remove('totalCalories');
 
-      final String diaryJson = json.encode({
-        'diaryEntries': _diaryEntries,
-        'diaryCalories': _diaryCalories,
-      });
+      final String diaryJson = json.encode({'diaryEntries': _diaryEntries, 'diaryCalories': _diaryCalories});
       await prefs.setString('foodDiary', diaryJson);
     } catch (e) {
       print('Error saving data: $e');
@@ -224,9 +200,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
       if (!hasSeenBmi && !_isShowingBmi) {
         _isShowingBmi = true;
         Future.delayed(Duration.zero, () {
-          if (mounted && !_bmiShown) {
-            _showBmiScreen();
-          }
+          if (mounted && !_bmiShown) _showBmiScreen();
         });
       }
     } catch (e) {
@@ -279,7 +253,6 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     return "Mega Feast";
   }
 
-  // This feedback is now based on the dynamically loaded _currentCalorieGoal.
   String _getQualitativeFeedback() {
     if (_currentCalorieGoal == 0) return "Set a goal to get started!";
     final double progress = _totalCalories / _currentCalorieGoal;
@@ -291,23 +264,18 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     return "Overshot Gains";
   }
 
-  // MODIFIED: Accepts an optional callback to update the bottom sheet's state.
   Future<void> _searchUSDAFood(String query, String mealType, {VoidCallback? onStateChanged}) async {
     if (query.isEmpty) return;
 
-    // Update state to show loading indicator
     setState(() {
       _isSearching = true;
       _searchResults.clear();
       _currentSearchMealType = mealType;
     });
-    onStateChanged?.call(); // Trigger sheet rebuild to show loader
+    onStateChanged?.call();
 
     try {
-      final response = await http.get(
-        Uri.parse('https://api.nal.usda.gov/fdc/v1/foods/search?query=$query&api_key=${widget.usdaApiKey}&pageSize=10'),
-      );
-
+      final response = await http.get(Uri.parse('https://api.nal.usda.gov/fdc/v1/foods/search?query=$query&api_key=${widget.usdaApiKey}&pageSize=10'));
       if (!mounted) return;
 
       List<Map<String, dynamic>> finalResults = [];
@@ -318,39 +286,25 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
         for (final food in foods) {
           final calories = _extractCalories(food['foodNutrients'] ?? []);
           if (calories > 0) {
-            finalResults.add({
-              'name': food['description'] ?? 'Unknown Food',
-              'calories': calories,
-              'classification': _classifyFood(calories),
-              'dataType': 'USDA',
-            });
+            finalResults.add({'name': food['description'] ?? 'Unknown Food', 'calories': calories, 'classification': _classifyFood(calories), 'dataType': 'USDA'});
           }
         }
-
-        if (finalResults.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No nutritional data found for "$query"')));
-        }
+        if (finalResults.isEmpty) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No nutritional data found for "$query"')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('API Error: ${response.statusCode}')));
       }
 
-      // Update state with results and stop searching
       setState(() {
         _searchResults = finalResults;
         _isSearching = false;
       });
-
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Search failed: $e')));
-        setState(() {
-          _isSearching = false; // Ensure loading stops on error
-        });
+        setState(() => _isSearching = false);
       }
     } finally {
-      if (mounted) {
-        onStateChanged?.call(); // Trigger final sheet rebuild to show results or empty state
-      }
+      if (mounted) onStateChanged?.call();
     }
   }
 
@@ -374,24 +328,14 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
           backgroundColor: Colors.transparent,
           child: Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(20),
-            ),
+            decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Serving for: ${foodItem['name']}",
-                    style: GoogleFonts.poppins(color: textColor, fontSize: 18, fontWeight: FontWeight.w600)),
+                Text("Serving for: ${foodItem['name']}", style: GoogleFonts.poppins(color: textColor, fontSize: 18, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 20),
-                ..._servingSizes.entries.map((size) => RadioListTile<String>(
-                  title: Text(size.key, style: GoogleFonts.inter(color: textColor, fontWeight: FontWeight.w500)),
-                  value: size.key,
-                  groupValue: _selectedServingSize,
-                  onChanged: (value) => setState(() => _selectedServingSize = value!),
-                  activeColor: accentColor,
-                )).toList(),
+                ..._servingSizes.entries.map((size) => RadioListTile<String>(title: Text(size.key, style: GoogleFonts.inter(color: textColor, fontWeight: FontWeight.w500)), value: size.key, groupValue: _selectedServingSize, onChanged: (value) => setState(() => _selectedServingSize = value!), activeColor: accentColor)).toList(),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -407,17 +351,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
                     final multiplier = _servingSizes[_selectedServingSize]!;
                     final baseCalories = (foodItem['calories'] * multiplier).round();
                     final totalCalories = baseCalories * _quantity;
-                    final newFoodEntry = {
-                      'calories': totalCalories,
-                      'name': foodItem['name'],
-                      'classification': _classifyFood(totalCalories),
-                      'mealType': _currentSearchMealType,
-                      'timestamp': DateTime.now().millisecondsSinceEpoch,
-                      'source': 'USDA',
-                      'servingSize': _selectedServingSize,
-                      'quantity': _quantity,
-                      'baseCalories': baseCalories,
-                    };
+                    final newFoodEntry = {'calories': totalCalories, 'name': foodItem['name'], 'classification': _classifyFood(totalCalories), 'mealType': _currentSearchMealType, 'timestamp': DateTime.now().millisecondsSinceEpoch, 'source': 'USDA', 'servingSize': _selectedServingSize, 'quantity': _quantity, 'baseCalories': baseCalories};
                     Navigator.pop(context, newFoodEntry);
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: secondaryColor, foregroundColor: Colors.white),
@@ -451,7 +385,6 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     _saveData();
   }
 
-  // MODIFIED: Accepts and passes on the state changed callback.
   void _addFoodFromLocal(String mealType, {VoidCallback? onStateChanged}) {
     final controller = _foodNameControllers[mealType]!;
     final foodName = controller.text.trim().toLowerCase();
@@ -462,18 +395,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
       _searchUSDAFood(foodName, mealType, onStateChanged: onStateChanged);
       return;
     }
-    _addFood({
-      'calories': calories,
-      'name': controller.text.trim(),
-      'classification': _classifyFood(calories),
-      'mealType': mealType,
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-      'source': 'Local',
-      'servingSize': 'Standard',
-      'quantity': 1,
-      'baseCalories': calories,
-    });
-    // If food is found locally, we still need to update the sheet to show the new entry
+    _addFood({'calories': calories, 'name': controller.text.trim(), 'classification': _classifyFood(calories), 'mealType': mealType, 'timestamp': DateTime.now().millisecondsSinceEpoch, 'source': 'Local', 'servingSize': 'Standard', 'quantity': 1, 'baseCalories': calories});
     onStateChanged?.call();
   }
 
@@ -498,29 +420,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     }
   }
 
-  void _undoRemove() {
-    if (_removedEntries.isNotEmpty) {
-      setState(() {
-        final lastRemoved = _removedEntries.removeLast();
-        _totalCalories += lastRemoved['calories'] as int;
-        _entries.add(lastRemoved);
-        _entries.sort((a, b) => (a['timestamp'] as int).compareTo(b['timestamp'] as int));
-
-        final String dateKey = _getDateKey(_selectedDate);
-        if (!_diaryEntries.containsKey(dateKey)) {
-          _diaryEntries[dateKey] = [];
-          _diaryCalories[dateKey] = 0;
-        }
-        _diaryEntries[dateKey]!.add(lastRemoved);
-        _diaryCalories[dateKey] = _diaryCalories[dateKey]! + lastRemoved['calories'] as int;
-      });
-      _saveData();
-    }
-  }
-
-  String _getDateKey(DateTime date) {
-    return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-  }
+  String _getDateKey(DateTime date) => "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
 
   void _changeDate(int days) {
     setState(() {
@@ -531,11 +431,9 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
 
   void _loadDateData() {
     final String dateKey = _getDateKey(_selectedDate);
-
     setState(() {
       _entries.clear();
       _totalCalories = 0;
-
       if (_diaryEntries.containsKey(dateKey)) {
         _entries.addAll(_diaryEntries[dateKey]!);
         _totalCalories = _diaryCalories[dateKey] ?? 0;
@@ -545,54 +443,15 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   }
 
   void _showDatePicker() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: accentColor,
-              onPrimary: Colors.white,
-              surface: primaryColor,
-              onSurface: textColor,
-            ),
-            dialogBackgroundColor: backgroundColor,
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-        _loadDateData();
-      });
-    }
+    final DateTime? picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime(2020), lastDate: DateTime.now().add(const Duration(days: 365)), builder: (context, child) => Theme(data: ThemeData.dark().copyWith(colorScheme: const ColorScheme.dark(primary: accentColor, onPrimary: Colors.white, surface: primaryColor, onSurface: textColor), dialogBackgroundColor: backgroundColor), child: child!));
+    if (picked != null && picked != _selectedDate) setState(() { _selectedDate = picked; _loadDateData(); });
   }
 
-  List<Map<String, dynamic>> _getEntriesByMealType(String mealType) {
-    return _entries.where((entry) => entry['mealType'] == mealType).toList();
-  }
-
-  String _getEmojiForMeal(String mealType) {
-    switch (mealType) {
-      case 'Breakfast': return '🍳';
-      case 'Lunch': return '🍔';
-      case 'Dinner': return '🍽️';
-      case 'Snack': return '🍎';
-      default: return '🍕';
-    }
-  }
+  List<Map<String, dynamic>> _getEntriesByMealType(String mealType) => _entries.where((entry) => entry['mealType'] == mealType).toList();
 
   @override
   void dispose() {
-    // MODIFICATION: Unregister the observer to prevent memory leaks.
     WidgetsBinding.instance.removeObserver(this);
-
     _foodNameControllers.values.forEach((controller) => controller.dispose());
     _progressAnimationController.dispose();
     _streakAnimationController.dispose();
@@ -600,50 +459,36 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     super.dispose();
   }
 
+  // NEW: Function to handle navigation to the Goals screen
+  void _navigateToGoalsScreen() async {
+    await Navigator.pushNamed(context, '/goals');
+    // After returning, reload data to reflect any changes
+    _loadCalorieGoal();
+    _checkIfGoalIsSet();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isToday = _selectedDate.year == DateTime.now().year &&
-        _selectedDate.month == DateTime.now().month &&
-        _selectedDate.day == DateTime.now().day;
-
-    // MODIFICATION: The Scaffold has no AppBar property, and the body uses SafeArea.
-    // This creates the clean, borderless look you requested.
+    final isToday = _selectedDate.year == DateTime.now().year && _selectedDate.month == DateTime.now().month && _selectedDate.day == DateTime.now().day;
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            // Date navigation row
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    icon: Icon(Icons.arrow_back_ios, color: textColor, size: 20),
-                    onPressed: () => _changeDate(-1),
-                  ),
-                  TextButton(
-                    onPressed: _showDatePicker,
-                    child: Text(
-                      isToday ? "Today" : "${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}",
-                      style: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.arrow_forward_ios, color: textColor, size: 20),
-                    onPressed: isToday ? null : () => _changeDate(1),
-                  ),
+                  IconButton(icon: Icon(Icons.arrow_back_ios, color: textColor, size: 20), onPressed: () => _changeDate(-1)),
+                  TextButton(onPressed: _showDatePicker, child: Text(isToday ? "Today" : "${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}", style: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.w600))),
+                  IconButton(icon: Icon(Icons.arrow_forward_ios, color: textColor, size: 20), onPressed: isToday ? null : () => _changeDate(1)),
                 ],
               ),
             ),
             const SizedBox(height: 8),
-
-            // MODIFIED: Top Summary Section with reduced height
             _buildTopSummarySection(),
             const SizedBox(height: 8),
-
-            // MODIFIED: Meal Carousel with Navigation - now positioned higher
             _buildMealCarouselWithNavigation(),
           ],
         ),
@@ -659,39 +504,21 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
         borderData: FlBorderData(show: false),
         lineBarsData: [
           LineChartBarData(
-            spots: const [
-              FlSpot(0, 3),
-              FlSpot(2.6, 2),
-              FlSpot(4.9, 5),
-              FlSpot(6.8, 3.1),
-              FlSpot(8, 4),
-              FlSpot(9.5, 3),
-              FlSpot(11, 4),
-            ],
+            spots: const [FlSpot(0, 3), FlSpot(2.6, 2), FlSpot(4.9, 5), FlSpot(6.8, 3.1), FlSpot(8, 4), FlSpot(9.5, 3), FlSpot(11, 4)],
             isCurved: true,
             color: accentColor.withOpacity(0.3),
             barWidth: 1.5,
             isStrokeCapRound: true,
             dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                colors: [
-                  accentColor.withOpacity(0.15),
-                  accentColor.withOpacity(0.0),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
+            belowBarData: BarAreaData(show: true, gradient: LinearGradient(colors: [accentColor.withOpacity(0.15), accentColor.withOpacity(0.0)], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
           ),
         ],
       ),
     );
   }
 
+  // MODIFIED: Added the new "Set/Change Goals" button
   Widget _buildTopSummarySection() {
-    // The progress circle now correctly uses the goal loaded from storage.
     final goal = _currentCalorieGoal > 0 ? _currentCalorieGoal.toDouble() : 2000.0;
     final consumed = _totalCalories.toDouble();
     final remaining = (goal - consumed).clamp(0, goal);
@@ -699,10 +526,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
       margin: const EdgeInsets.symmetric(horizontal: 16.0),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: Colors.transparent, borderRadius: BorderRadius.circular(20)),
       child: Column(
         children: [
           SizedBox(
@@ -718,29 +542,12 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
                     width: 100,
                     child: AnimatedBuilder(
                       animation: _progressAnimation,
-                      builder: (context, child) {
-                        return PieChart(
-                          PieChartData(
-                            startDegreeOffset: -90,
-                            sectionsSpace: 0,
-                            centerSpaceRadius: 35,
-                            sections: [
-                              PieChartSectionData(
-                                value: consumed * _progressAnimation.value,
-                                color: accentColor,
-                                radius: 10,
-                                showTitle: false,
-                              ),
-                              PieChartSectionData(
-                                value: remaining + (goal - (consumed * _progressAnimation.value)),
-                                color: Colors.grey.shade800,
-                                radius: 10,
-                                showTitle: false,
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                      builder: (context, child) => PieChart(
+                        PieChartData(startDegreeOffset: -90, sectionsSpace: 0, centerSpaceRadius: 35, sections: [
+                          PieChartSectionData(value: consumed * _progressAnimation.value, color: accentColor, radius: 10, showTitle: false),
+                          PieChartSectionData(value: remaining + (goal - (consumed * _progressAnimation.value)), color: Colors.grey.shade800, radius: 10, showTitle: false),
+                        ]),
+                      ),
                     ),
                   ),
                 ),
@@ -748,11 +555,23 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            _getQualitativeFeedback(),
-            style: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.w600),
-          ),
+          Text(_getQualitativeFeedback(), style: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
+
+          // --- NEW BUTTON ---
+          TextButton.icon(
+            onPressed: _navigateToGoalsScreen,
+            icon: Icon(_hasSetGoal ? Icons.edit_note : Icons.flag_outlined, color: textColor.withOpacity(0.7), size: 20),
+            label: Text(
+                _hasSetGoal ? "Change Goals" : "Set a Goal",
+                style: GoogleFonts.poppins(color: textColor.withOpacity(0.7), fontWeight: FontWeight.w500)
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              backgroundColor: cardColor.withOpacity(0.5),
+            ),
+          ),
         ],
       ),
     );
@@ -771,15 +590,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
               opacity: _currentPageValue > 0.1 ? 1.0 : 0.0,
               child: IgnorePointer(
                 ignoring: !(_currentPageValue > 0.1),
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_circle_left_rounded, color: textColor, size: 35),
-                  onPressed: () {
-                    _pageController.previousPage(
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeOutCubic,
-                    );
-                  },
-                ),
+                child: IconButton(icon: const Icon(Icons.arrow_circle_left_rounded, color: textColor, size: 35), onPressed: () => _pageController.previousPage(duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic)),
               ),
             ),
           ),
@@ -790,15 +601,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
               opacity: _currentPageValue < _mealTypes.length - 1.1 ? 1.0 : 0.0,
               child: IgnorePointer(
                 ignoring: !(_currentPageValue < _mealTypes.length - 1.1),
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_circle_right_rounded, color: textColor, size: 35),
-                  onPressed: () {
-                    _pageController.nextPage(
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeOutCubic,
-                    );
-                  },
-                ),
+                child: IconButton(icon: const Icon(Icons.arrow_circle_right_rounded, color: textColor, size: 35), onPressed: () => _pageController.nextPage(duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic)),
               ),
             ),
           ),
@@ -818,10 +621,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
           scale = (_currentPageValue - index).abs();
           scale = (1 - (scale * 0.2)).clamp(0.8, 1.0);
         }
-        return Transform.scale(
-          scale: scale,
-          child: _buildCarouselMealCard(mealType),
-        );
+        return Transform.scale(scale: scale, child: _buildCarouselMealCard(mealType));
       },
     );
   }
@@ -836,22 +636,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
       onTap: () => _showMealDetailSheet(mealType),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [cardColor.withOpacity(0.9), cardColor],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.7),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
+        decoration: BoxDecoration(gradient: LinearGradient(colors: [cardColor.withOpacity(0.9), cardColor], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.7), blurRadius: 12, offset: const Offset(0, 6))]),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -862,45 +647,18 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '$mealType',
-                        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
-                      ),
-                      SizedBox(
-                        height: 36,
-                        width: 36,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            CircularProgressIndicator(
-                              value: progress,
-                              backgroundColor: Colors.grey.shade800,
-                              valueColor: const AlwaysStoppedAnimation<Color>(accentColor),
-                              strokeWidth: 4,
-                            ),
-                            Center(
-                              child: Icon(Icons.check,
-                                  color: progress == 1.0 ? accentColor : Colors.transparent, size: 16),
-                            ),
-                          ],
-                        ),
-                      ),
+                      Text('$mealType', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+                      SizedBox(height: 36, width: 36, child: Stack(fit: StackFit.expand, children: [CircularProgressIndicator(value: progress, backgroundColor: Colors.grey.shade800, valueColor: const AlwaysStoppedAnimation<Color>(accentColor), strokeWidth: 4), Center(child: Icon(Icons.check, color: progress == 1.0 ? accentColor : Colors.transparent, size: 16))])),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    _classifyFood(totalMealCalories),
-                    style: GoogleFonts.inter(fontSize: 14, color: textColor.withOpacity(0.8)),
-                  ),
+                  Text(_classifyFood(totalMealCalories), style: GoogleFonts.inter(fontSize: 14, color: textColor.withOpacity(0.8))),
                   const SizedBox(height: 12),
                   if (mealEntries.isNotEmpty)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          "Logged Foods:",
-                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
-                        ),
+                        Text("Logged Foods:", style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: textColor)),
                         const SizedBox(height: 6),
                         SizedBox(
                           height: 70,
@@ -914,25 +672,8 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
                                 padding: const EdgeInsets.symmetric(vertical: 2.0),
                                 child: Row(
                                   children: [
-                                    Expanded(
-                                      child: Text(
-                                        "• ${entry['name']}",
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11,
-                                          color: textColor.withOpacity(0.8),
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                    Text(
-                                      entry['classification'],
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        color: textColor.withOpacity(0.7),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
+                                    Expanded(child: Text("• ${entry['name']}", style: GoogleFonts.inter(fontSize: 11, color: textColor.withOpacity(0.8)), overflow: TextOverflow.ellipsis, maxLines: 1)),
+                                    Text(entry['classification'], style: GoogleFonts.inter(fontSize: 11, color: textColor.withOpacity(0.7), fontWeight: FontWeight.w500)),
                                   ],
                                 ),
                               );
@@ -940,40 +681,18 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
                           ),
                         ),
                         if (mealEntries.length > 3)
-                          Text(
-                            "+ ${mealEntries.length - 3} more...",
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: textColor.withOpacity(0.6),
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
+                          Text("+ ${mealEntries.length - 3} more...", style: GoogleFonts.inter(fontSize: 11, color: textColor.withOpacity(0.6), fontStyle: FontStyle.italic)),
                       ],
                     )
                   else
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      child: Text(
-                        "No food logged yet",
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: textColor.withOpacity(0.5),
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 12.0), child: Text("No food logged yet", style: GoogleFonts.inter(fontSize: 12, color: textColor.withOpacity(0.5), fontStyle: FontStyle.italic))),
                 ],
               ),
               ElevatedButton.icon(
                 onPressed: () => _showMealDetailSheet(mealType),
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('Add Food', style: TextStyle(fontSize: 12)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: secondaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: secondaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
               ),
             ],
           ),
@@ -993,65 +712,34 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setSheetState) {
-            void updateSheet() {
-              setSheetState(() {});
-            }
+            void updateSheet() => setSheetState(() {});
             return DraggableScrollableSheet(
               initialChildSize: 0.6,
               minChildSize: 0.4,
               maxChildSize: 0.9,
               builder: (_, controller) {
                 return Container(
-                  decoration: const BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                  ),
+                  decoration: const BoxDecoration(color: primaryColor, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
                   child: Column(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text(
-                          mealType,
-                          style: GoogleFonts.poppins(color: textColor, fontSize: 22, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: _buildMealInput(mealType, onSearch: updateSheet),
-                      ),
-                      // --- MODIFICATION START: Moved Search Results into the scrollable list ---
+                      Padding(padding: const EdgeInsets.all(16.0), child: Text(mealType, style: GoogleFonts.poppins(color: textColor, fontSize: 22, fontWeight: FontWeight.bold))),
+                      Padding(padding: const EdgeInsets.symmetric(horizontal: 16.0), child: _buildMealInput(mealType, onSearch: updateSheet)),
                       Expanded(
                         child: ListView(
                           controller: controller,
                           padding: const EdgeInsets.all(16),
                           children: [
-                            // Show loading indicator or search results here
                             if (_isSearching && _currentSearchMealType == mealType)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 32.0),
-                                child: Center(child: CircularProgressIndicator(color: accentColor)),
-                              )
+                              const Padding(padding: EdgeInsets.symmetric(vertical: 32.0), child: Center(child: CircularProgressIndicator(color: accentColor)))
                             else if (_searchResults.isNotEmpty && _currentSearchMealType == mealType)
-                              _buildSearchResults(onFoodAdded: () {
-                                Navigator.pop(context);
-                              }),
-
-                            // Show logged entries
+                              _buildSearchResults(onFoodAdded: () => Navigator.pop(context)),
                             if (_getEntriesByMealType(mealType).isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.all(32.0),
-                                child: Text(
-                                  "No food logged for $mealType yet.",
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.inter(color: textColor.withOpacity(0.5)),
-                                ),
-                              )
+                              Padding(padding: const EdgeInsets.all(32.0), child: Text("No food logged for $mealType yet.", textAlign: TextAlign.center, style: GoogleFonts.inter(color: textColor.withOpacity(0.5))))
                             else
                               ..._buildMealEntryItems(mealType),
                           ],
                         ),
                       ),
-                      // --- MODIFICATION END ---
                     ],
                   ),
                 );
@@ -1063,53 +751,25 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     );
   }
 
-  // MODIFIED: Passes the onSearch callback to the search functions.
   Widget _buildMealInput(String mealType, {VoidCallback? onSearch}) {
     return Row(
       children: [
-        Expanded(
-          child: TextField(
-            controller: _foodNameControllers[mealType],
-            style: GoogleFonts.inter(color: textColor),
-            decoration: InputDecoration(
-              hintText: "Enter food name...",
-              hintStyle: GoogleFonts.inter(color: textColor.withOpacity(0.5)),
-              filled: true,
-              fillColor: cardColor,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-            onSubmitted: (value) {
-              _addFoodFromLocal(mealType, onStateChanged: onSearch);
-            },
-          ),
-        ),
+        Expanded(child: TextField(controller: _foodNameControllers[mealType], style: GoogleFonts.inter(color: textColor), decoration: InputDecoration(hintText: "Enter food name...", hintStyle: GoogleFonts.inter(color: textColor.withOpacity(0.5)), filled: true, fillColor: cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14)), onSubmitted: (value) => _addFoodFromLocal(mealType, onStateChanged: onSearch))),
         const SizedBox(width: 8),
-        IconButton(
-          icon: const Icon(Icons.search, color: accentColor),
-          onPressed: () {
-            final query = _foodNameControllers[mealType]!.text.trim();
-            if (query.isNotEmpty) {
-              _searchUSDAFood(query, mealType, onStateChanged: onSearch);
-            }
-          },
+        IconButton(icon: const Icon(Icons.search, color: accentColor), onPressed: () {
+          final query = _foodNameControllers[mealType]!.text.trim();
+          if (query.isNotEmpty) _searchUSDAFood(query, mealType, onStateChanged: onSearch);
+        },
         ),
       ],
     );
   }
 
-  // --- MODIFICATION: Removed outer container and calorie count ---
   Widget _buildSearchResults({VoidCallback? onFoodAdded}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          "Search Results:",
-          style: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+        Text("Search Results:", style: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         ListView.builder(
           shrinkWrap: true,
@@ -1120,8 +780,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
             return ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(food['name'], style: GoogleFonts.inter(color: textColor)),
-              subtitle: Text(food['classification'], // Only show classification
-                  style: GoogleFonts.inter(color: textColor.withOpacity(0.7))),
+              subtitle: Text(food['classification'], style: GoogleFonts.inter(color: textColor.withOpacity(0.7))),
               trailing: IconButton(
                 icon: const Icon(Icons.add_circle, color: accentColor),
                 onPressed: () async {
@@ -1144,12 +803,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     return entries.map((entry) {
       return Dismissible(
         key: Key(entry['timestamp'].toString()),
-        background: Container(
-          color: Colors.red,
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.only(right: 20),
-          child: const Icon(Icons.delete, color: Colors.white),
-        ),
+        background: Container(color: Colors.red, alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete, color: Colors.white)),
         direction: DismissDirection.endToStart,
         onDismissed: (direction) => _removeFood(_entries.indexWhere((e) => e['timestamp'] == entry['timestamp'])),
         child: Card(
@@ -1157,12 +811,8 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
           margin: const EdgeInsets.symmetric(vertical: 4),
           child: ListTile(
             title: Text(entry['name'], style: GoogleFonts.inter(color: textColor)),
-            subtitle: Text("${entry['classification']}",
-                style: GoogleFonts.inter(color: textColor.withOpacity(0.7))),
-            trailing: Text(
-              "${entry['quantity']}x ${entry['servingSize']}",
-              style: GoogleFonts.inter(color: textColor.withOpacity(0.6), fontSize: 12),
-            ),
+            subtitle: Text("${entry['classification']}", style: GoogleFonts.inter(color: textColor.withOpacity(0.7))),
+            trailing: Text("${entry['quantity']}x ${entry['servingSize']}", style: GoogleFonts.inter(color: textColor.withOpacity(0.6), fontSize: 12)),
           ),
         ),
       );
