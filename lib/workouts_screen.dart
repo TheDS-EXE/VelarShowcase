@@ -219,7 +219,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
         return Dialog(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          child: Center(child: Lottie.asset('assets/complete.json', repeat: false, width: 200, height: 200)),
+          child: Center(child: Lottie.asset('images/complete.json', repeat: false, width: 200, height: 200)),
         );
       },
     );
@@ -365,7 +365,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         leading: Icon(workout.icon, color: accentColor.withOpacity(0.8)),
         title: Text(workout.name, style: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)),
-        subtitle: hasActiveTimer ? Text(_isTimerRunningInBackground ? "Running..." : "Paused", style: GoogleFonts.poppins(color: Colors.orangeAccent, fontSize: 12)) : null,
+        subtitle: hasActiveTimer ? Text(_isTimerRunningInBackground ? "In Progress" : "Paused", style: GoogleFonts.poppins(color: Colors.orangeAccent, fontSize: 12)) : null,
         trailing: isDone ? Icon(Icons.check_circle_outline, color: accentColor.withOpacity(0.7), size: 24) : (hasActiveTimer ? const Icon(Icons.timelapse, color: Colors.orangeAccent) : Icon(Icons.arrow_forward_ios, size: 16, color: textColor.withOpacity(0.5))),
       ),
     );
