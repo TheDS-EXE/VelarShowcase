@@ -17,6 +17,14 @@ const Color backgroundColor = Color(0xFF1A1A1A); // Almost black
 const Color textColor = Color(0xFFE0E0E0); // Light grey text
 const Color cardColor = Color(0xFF242424); // Slightly lighter dark for cards
 
+// Helper class to handle weight data, now included in this file.
+class WeightEntry {
+  final double weight;
+  final DateTime date;
+
+  WeightEntry({required this.weight, required this.date});
+}
+
 class CalorieClassificationScreen extends StatefulWidget {
   final int calorieGoal;
   final String usdaApiKey;
@@ -53,10 +61,12 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   String _selectedServingSize = 'Standard';
   int _quantity = 1;
 
-  // NEW: State to track if the user has ever set a goal
   bool _hasSetGoal = false;
-
   int _currentCalorieGoal = 2000;
+
+  // State variables for weight tracking display
+  int _goalWeight = 70;
+  int _currentWeight = 70;
 
   DateTime _selectedDate = DateTime.now();
   final Map<String, List<Map<String, dynamic>>> _diaryEntries = {};
@@ -115,7 +125,8 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _loadCalorieGoal();
-      _checkIfGoalIsSet(); // Also re-check goal status
+      _checkIfGoalIsSet();
+      _loadWeightData(); // Also reload weight data
     }
   }
 
@@ -128,12 +139,12 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   Future<void> _loadAllData() async {
     await _checkIfGoalIsSet();
     await _loadCalorieGoal();
+    await _loadWeightData(); // Load weight data on startup
     await _loadSavedData();
     await _checkBmiStatus();
     _progressAnimationController.forward();
   }
 
-  // NEW: Checks SharedPreferences to see if a goal has been saved
   Future<void> _checkIfGoalIsSet() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
@@ -150,6 +161,28 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
         _currentCalorieGoal = prefs.getInt('finalCalorieGoal') ?? widget.calorieGoal;
       });
       _progressAnimationController.forward(from: 0.0);
+    }
+  }
+
+  Future<void> _loadWeightData() async {
+    final prefs = await SharedPreferences.getInstance();
+    int loadedCurrentWeight = 70;
+
+    final weightHistory = prefs.getStringList('weightHistory') ?? [];
+    if (weightHistory.isNotEmpty) {
+      final entries = weightHistory.map((entry) {
+        final parts = entry.split('|');
+        return WeightEntry(weight: double.parse(parts[0]), date: DateTime.parse(parts[1]));
+      }).toList();
+      entries.sort((a, b) => b.date.compareTo(a.date));
+      loadedCurrentWeight = entries.first.weight.round();
+    }
+
+    if (mounted) {
+      setState(() {
+        _currentWeight = loadedCurrentWeight;
+        _goalWeight = prefs.getInt("user_goal_weight") ?? loadedCurrentWeight;
+      });
     }
   }
 
@@ -423,8 +456,14 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   String _getDateKey(DateTime date) => "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
 
   void _changeDate(int days) {
+    final newDate = _selectedDate.add(Duration(days: days));
+    final now = DateTime.now();
+    // BUG FIX: Prevent navigating to a future date
+    if (newDate.isAfter(DateTime(now.year, now.month, now.day))) {
+      return; // Do nothing if the new date is in the future
+    }
     setState(() {
-      _selectedDate = _selectedDate.add(Duration(days: days));
+      _selectedDate = newDate;
       _loadDateData();
     });
   }
@@ -443,7 +482,7 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
   }
 
   void _showDatePicker() async {
-    final DateTime? picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime(2020), lastDate: DateTime.now().add(const Duration(days: 365)), builder: (context, child) => Theme(data: ThemeData.dark().copyWith(colorScheme: const ColorScheme.dark(primary: accentColor, onPrimary: Colors.white, surface: primaryColor, onSurface: textColor), dialogBackgroundColor: backgroundColor), child: child!));
+    final DateTime? picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime(2020), lastDate: DateTime.now(), builder: (context, child) => Theme(data: ThemeData.dark().copyWith(colorScheme: const ColorScheme.dark(primary: accentColor, onPrimary: Colors.white, surface: primaryColor, onSurface: textColor), dialogBackgroundColor: backgroundColor), child: child!));
     if (picked != null && picked != _selectedDate) setState(() { _selectedDate = picked; _loadDateData(); });
   }
 
@@ -459,12 +498,12 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     super.dispose();
   }
 
-  // NEW: Function to handle navigation to the Goals screen
   void _navigateToGoalsScreen() async {
     await Navigator.pushNamed(context, '/goals');
     // After returning, reload data to reflect any changes
     _loadCalorieGoal();
     _checkIfGoalIsSet();
+    _loadWeightData(); // Reload weight data
   }
 
   @override
@@ -482,7 +521,8 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
                 children: [
                   IconButton(icon: Icon(Icons.arrow_back_ios, color: textColor, size: 20), onPressed: () => _changeDate(-1)),
                   TextButton(onPressed: _showDatePicker, child: Text(isToday ? "Today" : "${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}", style: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.w600))),
-                  IconButton(icon: Icon(Icons.arrow_forward_ios, color: textColor, size: 20), onPressed: isToday ? null : () => _changeDate(1)),
+                  // BUG FIX: Button is now visually and functionally disabled
+                  IconButton(icon: Icon(Icons.arrow_forward_ios, color: isToday ? textColor.withOpacity(0.3) : textColor, size: 20), onPressed: isToday ? null : () => _changeDate(1)),
                 ],
               ),
             ),
@@ -517,7 +557,16 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
     );
   }
 
-  // MODIFIED: Added the new "Set/Change Goals" button
+  Widget _buildWeightStat(String label, String value) {
+    return Column(
+      children: [
+        Text(value, style: GoogleFonts.poppins(color: textColor, fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(label, style: GoogleFonts.inter(color: textColor.withOpacity(0.7), fontSize: 12)),
+      ],
+    );
+  }
+
   Widget _buildTopSummarySection() {
     final goal = _currentCalorieGoal > 0 ? _currentCalorieGoal.toDouble() : 2000.0;
     final consumed = _totalCalories.toDouble();
@@ -556,9 +605,18 @@ class _CalorieClassificationScreenState extends State<CalorieClassificationScree
           ),
           const SizedBox(height: 8),
           Text(_getQualitativeFeedback(), style: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
 
-          // --- NEW BUTTON ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildWeightStat('Current', '$_currentWeight kg'),
+              _buildWeightStat('Goal', '$_goalWeight kg'),
+              _buildWeightStat('To Go', '${(_goalWeight - _currentWeight).abs()} kg'),
+            ],
+          ),
+          const SizedBox(height: 16),
+
           TextButton.icon(
             onPressed: _navigateToGoalsScreen,
             icon: Icon(_hasSetGoal ? Icons.edit_note : Icons.flag_outlined, color: textColor.withOpacity(0.7), size: 20),

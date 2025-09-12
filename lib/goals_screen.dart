@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math; // Needed for animations
+import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // For more icons
 
 // Color scheme to match the rest of the app
 const Color primaryColor = Color(0xFF2C2C2C);
@@ -37,7 +38,10 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
   String? _selectedActivityLevel;
   int _currentAge = 25;
   int _currentHeight = 170;
-  int _currentWeight = 70;
+
+  int _goalWeight = 70;
+  int _currentWeightForCalc = 70;
+
 
   // Options for selection
   final List<String> _goals = ["Lose Weight", "Maintain Weight", "Gain Muscle"];
@@ -49,6 +53,14 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     "Very Active (hard exercise/sports 6-7 days a week)",
     "Super Active (very hard exercise & physical job)",
   ];
+
+  final Map<String, IconData> _activityIcons = {
+    "Sedentary (little or no exercise)": FontAwesomeIcons.couch,
+    "Lightly Active (light exercise/sports 1-3 days/week)": FontAwesomeIcons.personWalking,
+    "Moderately Active (moderate exercise/sports 3-5 days/week)": FontAwesomeIcons.personRunning,
+    "Very Active (hard exercise/sports 6-7 days a week)": FontAwesomeIcons.dumbbell,
+    "Super Active (very hard exercise & physical job)": FontAwesomeIcons.fire,
+  };
 
   late AnimationController _buttonPulseController;
 
@@ -71,41 +83,32 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     super.dispose();
   }
 
-  Future<void> _saveString(String key, String? value) async {
-    if (value == null) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(key, value);
-  }
-
-  Future<void> _saveInt(String key, int value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(key, value);
-  }
-
-  bool _isSameDate(DateTime date1, DateTime date2) {
-    return date1.year == date2.year && date1.month == date2.month && date1.day == date2.day;
-  }
-
   Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
+    int loadedCurrentWeight = 70;
+
+    // Load the user's actual current weight from their history for calculations
+    final weightHistory = prefs.getStringList('weightHistory') ?? [];
+    if (weightHistory.isNotEmpty) {
+      final entries = weightHistory.map((entry) {
+        final parts = entry.split('|');
+        return WeightEntry(weight: double.parse(parts[0]), date: DateTime.parse(parts[1]));
+      }).toList();
+      entries.sort((a, b) => b.date.compareTo(a.date));
+      loadedCurrentWeight = entries.first.weight.round();
+    }
+
     setState(() {
+      _currentWeightForCalc = loadedCurrentWeight;
+
       _selectedGoal = prefs.getString("user_goal");
       _selectedGender = prefs.getString("user_gender");
       _selectedActivityLevel = prefs.getString("user_activity_level");
       _currentAge = prefs.getInt("user_age") ?? 25;
       _currentHeight = prefs.getInt("userHeight") ?? 170;
 
-      final weightHistory = prefs.getStringList('weightHistory') ?? [];
-      if (weightHistory.isNotEmpty) {
-        final entries = weightHistory.map((entry) {
-          final parts = entry.split('|');
-          return WeightEntry(weight: double.parse(parts[0]), date: DateTime.parse(parts[1]));
-        }).toList();
-        entries.sort((a, b) => b.date.compareTo(a.date));
-        _currentWeight = entries.first.weight.round();
-      } else {
-        _currentWeight = 70;
-      }
+      // Load the goal weight, defaulting to their current weight if not set
+      _goalWeight = prefs.getInt("user_goal_weight") ?? loadedCurrentWeight;
     });
   }
 
@@ -114,7 +117,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     final gender = _selectedGender ?? 'Male';
     final age = _currentAge;
     final height = _currentHeight;
-    final weight = _currentWeight.toDouble();
+    final weight = _currentWeightForCalc.toDouble();
     final activityLevel = _selectedActivityLevel ?? "Sedentary (little or no exercise)";
     final goal = _selectedGoal ?? "Maintain Weight";
 
@@ -159,42 +162,24 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
 
   Future<void> _saveProfileData() async {
     final prefs = await SharedPreferences.getInstance();
-    final weightHistory = prefs.getStringList('weightHistory') ?? [];
-    List<WeightEntry> entries = weightHistory.map((entry) {
-      final parts = entry.split('|');
-      return WeightEntry(weight: double.parse(parts[0]), date: DateTime.parse(parts[1]));
-    }).toList();
 
-    final today = DateTime.now();
-    final todayEntryIndex = entries.indexWhere((e) => _isSameDate(e.date, today));
-
-    if (todayEntryIndex != -1) {
-      entries[todayEntryIndex] = WeightEntry(weight: _currentWeight.toDouble(), date: entries[todayEntryIndex].date);
-    } else {
-      entries.add(WeightEntry(weight: _currentWeight.toDouble(), date: today));
-    }
-
-    entries.sort((a, b) => a.date.compareTo(b.date));
-    final updatedHistory = entries.map((entry) => '${entry.weight}|${entry.date.toIso8601String()}').toList();
-    await prefs.setStringList('weightHistory', updatedHistory);
-
+    // CORRECTED: This function no longer reads from or writes to 'weightHistory'.
+    // It only saves the profile and goal settings.
     await Future.wait([
       if (_selectedGoal != null) prefs.setString("user_goal", _selectedGoal!),
       if (_selectedGender != null) prefs.setString("user_gender", _selectedGender!),
       if (_selectedActivityLevel != null) prefs.setString("user_activity_level", _selectedActivityLevel!),
       prefs.setInt("user_age", _currentAge),
       prefs.setInt("userHeight", _currentHeight),
+      prefs.setInt("user_goal_weight", _goalWeight), // Save the goal weight
     ]);
 
     await _calculateAndSaveCalorieGoal();
 
     if (mounted) {
-      setState(() {
-        _currentWeight = _currentWeight;
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Your profile has been updated!", style: GoogleFonts.inter(color: textColor)),
+          content: Text("Your profile and goals have been updated!", style: GoogleFonts.inter(color: textColor)),
           backgroundColor: primaryColor,
           duration: const Duration(seconds: 2),
         ),
@@ -204,9 +189,17 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    // MODIFIED: This screen is now a Scaffold with a transparent background
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        title: Text(
+          'Your Goals & Profile',
+          style: GoogleFonts.poppins(color: textColor),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: textColor),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
         child: Column(
@@ -231,7 +224,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               maxValue: 100,
               onChanged: (value) {
                 setState(() => _currentAge = value);
-                _saveInt("user_age", value);
               },
             ),
             const SizedBox(height: 20),
@@ -243,18 +235,22 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
               suffix: " cm",
               onChanged: (value) {
                 setState(() => _currentHeight = value);
-                _saveInt("userHeight", value);
               },
             ),
             const SizedBox(height: 20),
             _buildStatSlider(
-              title: "Current Weight",
-              value: _currentWeight,
+              title: "Goal Weight",
+              value: _goalWeight,
               minValue: 30,
               maxValue: 200,
               suffix: " kg",
-              onChanged: (value) => setState(() => _currentWeight = value),
+              onChanged: (value) => setState(() => _goalWeight = value),
             ),
+            const SizedBox(height: 32),
+
+            _buildSectionTitle("Activity Level"),
+            const SizedBox(height: 16),
+            _buildActivityLevelSelection(),
             const SizedBox(height: 50),
 
             _buildContinueButton(),
@@ -292,7 +288,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       child: GestureDetector(
         onTap: () {
           setState(() => _selectedGoal = goal);
-          _saveString("user_goal", goal);
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
@@ -355,7 +350,6 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     return GestureDetector(
       onTap: () {
         setState(() => _selectedGender = gender);
-        _saveString("user_gender", gender);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
@@ -445,6 +439,80 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
     );
   }
 
+  Widget _buildActivityLevelSelection() {
+    return Column(
+      children: _activityLevels.map((level) {
+        bool isSelected = _selectedActivityLevel == level;
+        return _buildActivityCard(level, _activityIcons[level]!, isSelected);
+      }).toList(),
+    );
+  }
+
+  Widget _buildActivityCard(String level, IconData icon, bool isSelected) {
+    final parts = level.split(' (');
+    final title = parts[0];
+    final subtitle = parts.length > 1 ? '(${parts[1]}' : '';
+
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedActivityLevel = level);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? accentColor : Colors.white.withOpacity(0.1),
+            width: 2,
+          ),
+          boxShadow: isSelected
+              ? [
+            BoxShadow(
+              color: accentColor.withOpacity(0.4),
+              blurRadius: 12,
+              spreadRadius: 1,
+            ),
+          ] : [],
+        ),
+        child: Row(
+          children: [
+            FaIcon(icon, color: isSelected ? accentColor : textColor.withOpacity(0.7), size: 24),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      color: isSelected ? accentColor : textColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  if (subtitle.isNotEmpty)
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.inter(
+                        color: textColor.withOpacity(0.6),
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle, color: accentColor, size: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildContinueButton() {
     return AnimatedBuilder(
       animation: _buttonPulseController,
@@ -471,7 +539,7 @@ class _GoalsScreenState extends State<GoalsScreen> with TickerProviderStateMixin
       },
       child: Center(
         child: Text(
-          "Save Goals",
+          "Save Profile & Goals",
           style: GoogleFonts.poppins(
             fontSize: 18,
             fontWeight: FontWeight.w600,

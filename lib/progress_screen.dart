@@ -367,6 +367,7 @@ class _ProgressScreenState extends State<ProgressScreen> with SingleTickerProvid
   }
 }
 
+// --- REWORKED GRAPH PAINTER ---
 class _WeightGraphPainter extends CustomPainter {
   final List<WeightEntry> weightHistory;
   final double animationValue;
@@ -380,90 +381,91 @@ class _WeightGraphPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (weightHistory.length < 2) return;
 
-    // --- MODIFICATION START: Add padding and adjust drawable area ---
-    const double topPadding = 20.0;
-    const double bottomPadding = 20.0; // For date labels
-    const double horizontalPadding = 5.0; // Minimal horizontal padding
+    // 1. Define clear padding for the graph area.
+    // MODIFIED: Increased padding for more space.
+    const double topPadding = 30.0;    // Increased from 20
+    const double bottomPadding = 40.0; // Increased from 35
+    const double leftPadding = 50.0;   // Increased from 45
+    const double rightPadding = 25.0;  // Increased from 15
 
+    // 2. Calculate the actual drawable area for the graph line
     final double drawableHeight = size.height - topPadding - bottomPadding;
-    final double drawableWidth = size.width - (2 * horizontalPadding);
+    final double drawableWidth = size.width - leftPadding - rightPadding;
 
-    // Stop painting if the canvas is too small to avoid errors.
     if (drawableHeight <= 0 || drawableWidth <= 0) return;
-    // --- MODIFICATION END ---
 
-    weightHistory.sort((a, b) => a.date.compareTo(b.date));
+    final sortedHistory = List<WeightEntry>.from(weightHistory)
+      ..sort((a, b) => a.date.compareTo(b.date));
 
-    // --- Smarter logic for calculating graph labels ---
-    double minDataWeight = weightHistory.map((e) => e.weight).reduce(min);
-    double maxDataWeight = weightHistory.map((e) => e.weight).reduce(max);
-    const int maxHorizontalLines = 3;
-    double interval = 5.0;
-    double niceMinWeight = (minDataWeight / interval).floor() * interval;
-    double niceMaxWeight = (maxDataWeight / interval).ceil() * interval;
+    // 3. Calculate "nice" min/max values for the Y-axis to make the graph look good
+    double minDataWeight = sortedHistory.map((e) => e.weight).reduce(min);
+    double maxDataWeight = sortedHistory.map((e) => e.weight).reduce(max);
 
-    while (((niceMaxWeight - niceMinWeight) / interval).floor() > maxHorizontalLines) {
-      interval *= 2;
+    // MODIFIED: Make the graph dynamic by adding a larger buffer to min/max
+    double graphMinY = (minDataWeight - 4).floor().toDouble(); // Buffer increased from 2 to 4
+    double graphMaxY = (maxDataWeight + 4).ceil().toDouble();  // Buffer increased from 2 to 4
+    if (graphMinY == graphMaxY) {
+      graphMaxY += 5; // Add a buffer if all values are the same
     }
-    niceMinWeight = (minDataWeight / interval).floor() * interval;
-    niceMaxWeight = (maxDataWeight / interval).ceil() * interval;
+    final double yRange = graphMaxY - graphMinY;
+    if (yRange <= 0) return;
 
-    if (niceMinWeight == niceMaxWeight) {
-      niceMaxWeight += interval;
-    }
-    double niceRange = niceMaxWeight - niceMinWeight;
-    if (niceRange <= 0) niceRange = 1;
 
-    final points = <Offset>[];
-    for (int i = 0; i < weightHistory.length; i++) {
-      // --- MODIFICATION: Use drawable area and padding for coordinates ---
-      final x = horizontalPadding + drawableWidth * (i / (weightHistory.length - 1));
-      final y = topPadding + (drawableHeight - ((weightHistory[i].weight - niceMinWeight) / niceRange) * drawableHeight);
-      points.add(Offset(x, y));
-    }
-
+    // 4. Draw the horizontal grid lines and Y-axis labels
     final gridPaint = Paint()
       ..color = Colors.white.withOpacity(0.08)
       ..strokeWidth = 0.8
       ..style = PaintingStyle.stroke;
 
-    for (double labelValue = niceMinWeight; labelValue <= niceMaxWeight; labelValue += interval) {
-      if (labelValue == niceMinWeight) continue;
-      // --- MODIFICATION: Calculate Y position using padded drawable area ---
-      final y = topPadding + (drawableHeight - ((labelValue - niceMinWeight) / niceRange) * drawableHeight);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    const int horizontalLineCount = 3;
+    final double yInterval = yRange / horizontalLineCount;
+
+    for (int i = 0; i <= horizontalLineCount; i++) {
+      final labelValue = graphMinY + (i * yInterval);
+      final y = topPadding + (drawableHeight - ((labelValue - graphMinY) / yRange) * drawableHeight);
+
+      // Draw grid line from the left padding edge to the right padding edge
+      canvas.drawLine(Offset(leftPadding, y), Offset(size.width - rightPadding, y), gridPaint);
 
       final textSpan = TextSpan(
-        text: '${labelValue.round()}kg',
+        text: '${labelValue.toStringAsFixed(0)}kg',
         style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 10),
       );
-      final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(4, y - textPainter.height / 2));
+      final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+
+      // Right-align the text within the left padding area
+      textPainter.paint(canvas, Offset(leftPadding - textPainter.width - 4, y - textPainter.height / 2));
     }
 
-    if (weightHistory.length > 1) {
-      final dateTextStyle = TextStyle(color: textColor.withOpacity(0.6), fontSize: 10);
-      final indicesToShow = {0, weightHistory.length ~/ 2, weightHistory.length - 1}.toList();
+    // 5. Intelligently draw date labels (X-axis) to prevent overlap
+    final dateTextStyle = TextStyle(color: textColor.withOpacity(0.6), fontSize: 10);
+    final indicesToShow = _getTickIndices(totalItems: sortedHistory.length, maxTicks: (drawableWidth / 65).floor());
 
-      for (final index in indicesToShow) {
-        final entry = weightHistory[index];
-        final x = horizontalPadding + drawableWidth * (index / (weightHistory.length - 1));
-        final formattedDate = '${entry.date.day}/${entry.date.month}';
-        final textSpan = TextSpan(text: formattedDate, style: dateTextStyle);
-        final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
-        textPainter.layout();
-        final labelX = (x - textPainter.width / 2).clamp(0.0, size.width - textPainter.width);
-        // --- MODIFICATION: Paint inside the canvas using bottom padding ---
-        textPainter.paint(canvas, Offset(labelX, size.height - bottomPadding + 4));
-      }
+    for (final index in indicesToShow) {
+      final entry = sortedHistory[index];
+      final x = leftPadding + drawableWidth * (index / (sortedHistory.length - 1));
+      final formattedDate = '${entry.date.day}/${entry.date.month}';
+      final textSpan = TextSpan(text: formattedDate, style: dateTextStyle);
+      final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+      final labelX = (x - textPainter.width / 2).clamp(leftPadding, size.width - rightPadding - textPainter.width);
+
+      // Paint date labels within the bottom padding area
+      textPainter.paint(canvas, Offset(labelX, size.height - bottomPadding + 8));
+    }
+
+
+    // 6. Calculate the positions of each point on the graph
+    final points = <Offset>[];
+    for (int i = 0; i < sortedHistory.length; i++) {
+      final x = leftPadding + drawableWidth * (i / (sortedHistory.length - 1));
+      final y = topPadding + (drawableHeight - ((sortedHistory[i].weight - graphMinY) / yRange) * drawableHeight);
+      points.add(Offset(x, y));
     }
 
     if (points.length < 2) return;
 
-    final path = Path();
-    path.moveTo(points[0].dx, points[0].dy);
-
+    // 7. Create and animate the curved path for the line
+    final path = Path()..moveTo(points[0].dx, points[0].dy);
     for (int i = 0; i < points.length - 1; i++) {
       final p1 = points[i];
       final p2 = points[i + 1];
@@ -476,13 +478,8 @@ class _WeightGraphPainter extends CustomPainter {
       );
     }
 
-    final animatedPath = Path();
     final metrics = path.computeMetrics().first;
-    final totalLength = metrics.length;
-    final animatedLength = totalLength * animationValue;
-
-    final extractMetrics = metrics.extractPath(0, animatedLength);
-    animatedPath.addPath(extractMetrics, Offset.zero);
+    final animatedPath = metrics.extractPath(0, metrics.length * animationValue);
 
     final glowPaint = Paint()
       ..color = accentColor.withOpacity(0.5)
@@ -497,17 +494,14 @@ class _WeightGraphPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    final pointPaint = Paint()
-      ..color = accentColor
-      ..style = PaintingStyle.fill;
+    final pointPaint = Paint()..color = accentColor..style = PaintingStyle.fill;
 
     canvas.drawPath(animatedPath, glowPaint);
     canvas.drawPath(animatedPath, linePaint);
 
-    // This section needs to iterate over the calculated `points`, not create new ones.
+    // 8. Draw the circles on top of the line
     for (int i = 0; i < points.length; i++) {
       final point = points[i];
-      // The progress should be calculated based on the animation value, not re-invented.
       final pathProgressForPoint = (i / (points.length - 1));
       if (animationValue >= pathProgressForPoint) {
         canvas.drawCircle(point, 5, pointPaint);
@@ -516,12 +510,30 @@ class _WeightGraphPainter extends CustomPainter {
     }
   }
 
+  // Helper to calculate which indices to show labels for on the X-axis
+  List<int> _getTickIndices({required int totalItems, required int maxTicks}) {
+    if (totalItems <= 1) return [0];
+    if (totalItems <= maxTicks) {
+      return List.generate(totalItems, (index) => index);
+    }
+
+    final indices = <int>{};
+    final step = (totalItems - 1) / (maxTicks - 1);
+    for (int i = 0; i < maxTicks; i++) {
+      indices.add((i * step).round());
+    }
+    return indices.toList();
+  }
+
+
   @override
   bool shouldRepaint(covariant _WeightGraphPainter oldDelegate) {
     return oldDelegate.weightHistory != weightHistory ||
         oldDelegate.animationValue != animationValue;
   }
 }
+// --- END OF REWORK ---
+
 
 class HistoryDialog extends StatelessWidget {
   final List<WeightEntry> history;

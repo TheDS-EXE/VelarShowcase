@@ -1,17 +1,21 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
+import 'package:replog_icons/replog_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-// Consistent styling copied from goals_screen.dart
-const Color accentColor = Color(0xFFD32F2F);
-const Color backgroundColor = Color(0xFF1A1A1A);
-const Color cardColor = Color(0xFF242424);
-const Color textColor = Color(0xFFE0E0E0);
+// Consistent styling for the new theme
+const Color accentColor = Color(0xFFE53935); // A brighter, more energetic red
+const Color backgroundColor = Color(0xFF000000); // True black for high contrast
+const Color cardColor = Color(0xFF1A1A1A); // Very dark grey for cards
+const Color textColor = Color(0xFFFFFFFF); // Pure white for text
+const Color mutedTextColor = Color(0xFF8A8A8A); // Muted grey for subtitles
 
 // --- Data Models for Workouts ---
 enum WorkoutType { timeBased, repBased, breathing }
@@ -20,6 +24,7 @@ class Workout {
   final String name;
   final String description;
   final String goal;
+  final String subtitle;
   final WorkoutType type;
   final IconData icon;
 
@@ -27,6 +32,7 @@ class Workout {
     required this.name,
     required this.description,
     required this.goal,
+    required this.subtitle,
     required this.type,
     required this.icon,
   });
@@ -41,84 +47,84 @@ class WorkoutsScreen extends StatefulWidget {
   State<WorkoutsScreen> createState() => _WorkoutsScreenState();
 }
 
-class _WorkoutsScreenState extends State<WorkoutsScreen> {
-  // Data structure now uses the Workout class
+class _WorkoutsScreenState extends State<WorkoutsScreen> with TickerProviderStateMixin {
+  // Workouts curated based on hypertrophy principles
   final Map<String, List<Workout>> _workoutsByMood = {
     'Energetic': [
-      Workout(name: 'HIIT', description: 'High-intensity interval training.', goal: '20 minutes', type: WorkoutType.timeBased, icon: Icons.whatshot),
-      Workout(name: 'Running', description: 'Cardiovascular exercise for endurance.', goal: '30 minutes', type: WorkoutType.timeBased, icon: Icons.directions_run),
-      Workout(name: 'Jump Rope', description: 'Full-body workout for coordination.', goal: '15 minutes', type: WorkoutType.timeBased, icon: Icons.height),
-      Workout(name: 'Burpees', description: 'A full-body strength and aerobic exercise.', goal: '3 sets of 10', type: WorkoutType.repBased, icon: Icons.fitness_center),
-      Workout(name: 'Mountain Climbers', description: 'A dynamic exercise for core strength.', goal: '3 sets of 45s', type: WorkoutType.timeBased, icon: Icons.landscape),
-      Workout(name: 'High Knees', description: 'An intense cardio exercise.', goal: '3 sets of 45s', type: WorkoutType.timeBased, icon: Icons.sports_kabaddi),
-      Workout(name: 'Cycling', description: 'Low-impact cardio for leg strength.', goal: '45 minutes', type: WorkoutType.timeBased, icon: Icons.directions_bike),
-      Workout(name: 'Boxing Drills', description: 'Improves speed, power, and cardio.', goal: '20 minutes', type: WorkoutType.timeBased, icon: Icons.sports_mma),
-      Workout(name: 'Kettlebell Swings', description: 'Builds power in the posterior chain.', goal: '4 sets of 15', type: WorkoutType.repBased, icon: Icons.anchor),
-      Workout(name: 'Battle Ropes', description: 'A high-intensity upper body workout.', goal: '5 sets of 30s', type: WorkoutType.timeBased, icon: Icons.waves),
-      Workout(name: 'Plyo Jumps', description: 'Explosive jumps to build power.', goal: '3 sets of 12', type: WorkoutType.repBased, icon: Icons.arrow_upward),
-      Workout(name: 'Stair Sprints', description: 'A challenging cardio workout.', goal: '10 minutes', type: WorkoutType.timeBased, icon: Icons.show_chart),
-      Workout(name: 'Dance Cardio', description: 'A fun way to get your heart rate up.', goal: '30 minutes', type: WorkoutType.timeBased, icon: Icons.music_note),
-      Workout(name: 'Rowing', description: 'A full-body workout for strength and cardio.', goal: '20 minutes', type: WorkoutType.timeBased, icon: Icons.rowing),
-      Workout(name: 'Jumping Jacks', description: 'A classic warm-up and cardio exercise.', goal: '3 sets of 50', type: WorkoutType.repBased, icon: Icons.star),
-    ],
-    'Tired': [
-      Workout(name: 'Gentle Stretching', description: 'Increase flexibility and relieve tension.', goal: '15 minutes', type: WorkoutType.timeBased, icon: Icons.accessibility_new),
-      Workout(name: 'Light Yoga', description: 'Poses and breathing to relax the body.', goal: '20 minutes', type: WorkoutType.timeBased, icon: Icons.spa),
-      Workout(name: 'Mindful Walking', description: 'Low-impact exercise to clear your head.', goal: '30 minutes', type: WorkoutType.timeBased, icon: Icons.directions_walk),
-      Workout(name: 'Foam Rolling', description: 'Myofascial release to soothe sore muscles.', goal: '10 minutes', type: WorkoutType.timeBased, icon: Icons.healing),
-      Workout(name: 'Tai Chi', description: 'A gentle martial art for balance and calm.', goal: '20 minutes', type: WorkoutType.timeBased, icon: Icons.self_improvement),
-      Workout(name: 'Child\'s Pose', description: 'A resting pose to stretch the back.', goal: '5 minutes', type: WorkoutType.timeBased, icon: Icons.airline_seat_recline_normal),
-      Workout(name: 'Cat-Cow Stretch', description: 'Warms up the spine and relieves back pain.', goal: '3 sets of 10', type: WorkoutType.repBased, icon: Icons.pets),
-      Workout(name: 'Seated Forward Bend', description: 'Stretches hamstrings and lower back.', goal: '3 sets of 30s', type: WorkoutType.timeBased, icon: Icons.airline_seat_legroom_reduced),
-      Workout(name: 'Leg Swings', description: 'Dynamic stretch for hip mobility.', goal: '2 sets of 15', type: WorkoutType.repBased, icon: Icons.swap_horiz),
-      Workout(name: 'Arm Circles', description: 'Warms up the shoulder joints.', goal: '2 sets of 15', type: WorkoutType.repBased, icon: Icons.track_changes),
-      Workout(name: 'Neck Rolls', description: 'Relieves tension in the neck and shoulders.', goal: '10 rolls', type: WorkoutType.repBased, icon: Icons.psychology_alt),
-      Workout(name: 'Deep Breathing', description: 'Calms the nervous system.', goal: '5 minutes', type: WorkoutType.breathing, icon: Icons.air),
-      Workout(name: 'Ankle Rotations', description: 'Improves ankle mobility.', goal: '15 rotations', type: WorkoutType.repBased, icon: Icons.rotate_right),
-      Workout(name: 'Wrist Stretches', description: 'Prevents strain from typing or lifting.', goal: '3 sets of 30s', type: WorkoutType.timeBased, icon: Icons.front_hand),
-      Workout(name: 'Gentle Twists', description: 'Improves spinal mobility.', goal: '3 sets of 30s', type: WorkoutType.timeBased, icon: Icons.rotate_90_degrees_ccw),
+      Workout(name: 'Barbell Squats', description: 'The king of leg exercises for overall mass.', goal: '3 sets of 8-12', subtitle: '3 sets • Strength', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Romanian Deadlifts', description: 'Targets hamstrings and glutes with a hip hinge.', goal: '3 sets of 10-15', subtitle: '3 sets • Hypertrophy', type: WorkoutType.repBased, icon: FontAwesomeIcons.weightHanging),
+      Workout(name: 'Leg Press', description: 'A stable alternative to squats for quad volume.', goal: '4 sets of 12-20', subtitle: '4 sets • Hypertrophy', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Bench Press', description: 'Builds the chest, shoulders, and triceps.', goal: '3 sets of 8-12', subtitle: '3 sets • Strength', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Pull-Ups', description: 'Develops back width and bicep strength.', goal: '3 sets to failure', subtitle: '3 sets • Bodyweight', type: WorkoutType.repBased, icon: FontAwesomeIcons.person),
+      Workout(name: 'Overhead Press', description: 'Builds strong and broad shoulders.', goal: '3 sets of 8-12', subtitle: '3 sets • Strength', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Bent Over Rows', description: 'Develops back thickness and pulling strength.', goal: '3 sets of 10-15', subtitle: '3 sets • Hypertrophy', type: WorkoutType.repBased, icon: FontAwesomeIcons.weightHanging),
+      Workout(name: 'Incline Dumbbell Press', description: 'Emphasizes the upper chest for a fuller look.', goal: '3 sets of 10-15', subtitle: '3 sets • Hypertrophy', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'HIIT Sprints', description: 'High-intensity cardio to boost metabolism.', goal: '8 rounds of 30s', subtitle: '15 min • Cardio', type: WorkoutType.timeBased, icon: FontAwesomeIcons.personRunning),
+      Workout(name: 'Dumbbell Lunges', description: 'Unilateral exercise for leg stability and growth.', goal: '3 sets of 12-15', subtitle: '3 sets • Stability', type: WorkoutType.repBased, icon: FontAwesomeIcons.personWalking),
+      Workout(name: 'Lat Pulldowns', description: 'A stable alternative to pull-ups.', goal: '3 sets of 12-20', subtitle: '3 sets • Hypertrophy', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Skull Crushers', description: 'An isolation exercise for tricep mass.', goal: '3 sets of 12-20', subtitle: '3 sets • Isolation', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Bicep Curls', description: 'The classic exercise for building bicep peaks.', goal: '3 sets of 12-20', subtitle: '3 sets • Isolation', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Lateral Raises', description: 'Builds the side delts for shoulder width.', goal: '4 sets of 15-25', subtitle: '4 sets • Hypertrophy', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Calf Raises', description: 'Targets the gastrocnemius for calf growth.', goal: '4 sets of 15-25', subtitle: '4 sets • Isolation', type: WorkoutType.repBased, icon: FontAwesomeIcons.personWalking),
     ],
     'Strong': [
-      Workout(name: 'Pushups', description: 'Classic bodyweight chest exercise.', goal: '3 sets of 12', type: WorkoutType.repBased, icon: Icons.arrow_upward),
-      Workout(name: 'Squats', description: 'Fundamental lower body exercise.', goal: '3 sets of 15', type: WorkoutType.repBased, icon: Icons.airline_seat_legroom_normal),
-      Workout(name: 'Weightlifting', description: 'Build muscle with weights.', goal: '45 minutes', type: WorkoutType.timeBased, icon: Icons.fitness_center),
-      Workout(name: 'Pull-ups', description: 'Builds back and bicep strength.', goal: '3 sets to failure', type: WorkoutType.repBased, icon: Icons.arrow_upward),
-      Workout(name: 'Lunges', description: 'Strengthens legs and glutes individually.', goal: '3 sets of 12', type: WorkoutType.repBased, icon: Icons.directions_walk),
-      Workout(name: 'Plank', description: 'A core stability and strength exercise.', goal: '3 sets of 60s', type: WorkoutType.timeBased, icon: Icons.horizontal_rule),
-      Workout(name: 'Deadlifts', description: 'A full-body compound lift.', goal: '4 sets of 8', type: WorkoutType.repBased, icon: Icons.line_weight),
-      Workout(name: 'Bench Press', description: 'Builds chest, shoulder, and tricep strength.', goal: '4 sets of 10', type: WorkoutType.repBased, icon: Icons.horizontal_rule),
-      Workout(name: 'Overhead Press', description: 'Develops shoulder and upper body strength.', goal: '4 sets of 10', type: WorkoutType.repBased, icon: Icons.arrow_upward),
-      Workout(name: 'Bicep Curls', description: 'Isolation exercise for the biceps.', goal: '3 sets of 12', type: WorkoutType.repBased, icon: Icons.sports_kabaddi),
-      Workout(name: 'Tricep Dips', description: 'Uses bodyweight to target the triceps.', goal: '3 sets of 15', type: WorkoutType.repBased, icon: Icons.arrow_downward),
-      Workout(name: 'Crunches', description: 'Targets the abdominal muscles.', goal: '3 sets of 20', type: WorkoutType.repBased, icon: Icons.hdr_strong),
-      Workout(name: 'Leg Raises', description: 'Focuses on the lower abdominal muscles.', goal: '3 sets of 15', type: WorkoutType.repBased, icon: Icons.reorder),
-      Workout(name: 'Glute Bridges', description: 'Activates and strengthens the glutes.', goal: '3 sets of 20', type: WorkoutType.repBased, icon: Icons.arrow_upward),
-      Workout(name: 'Russian Twists', description: 'A core exercise for the obliques.', goal: '3 sets of 20', type: WorkoutType.repBased, icon: Icons.sync_alt),
+      Workout(name: 'Deadlifts', description: 'A full-body lift for maximum strength.', goal: '3 sets of 5-8', subtitle: '3 sets • Strength', type: WorkoutType.repBased, icon: FontAwesomeIcons.weightHanging),
+      Workout(name: 'Heavy Squats', description: 'Focus on strength with lower reps.', goal: '4 sets of 5-8', subtitle: '4 sets • Strength', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Heavy Bench Press', description: 'Build raw pressing power.', goal: '4 sets of 5-8', subtitle: '4 sets • Strength', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Weighted Pull-Ups', description: 'Adds intensity to the classic pull-up.', goal: '4 sets of 5-8', subtitle: '4 sets • Strength', type: WorkoutType.repBased, icon: FontAwesomeIcons.person),
+      Workout(name: 'Push Press', description: 'An explosive overhead pressing movement.', goal: '3 sets of 5-8', subtitle: '3 sets • Power', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Leg Curls', description: 'Isolates the hamstrings for hypertrophy.', goal: '3 sets of 12-20', subtitle: '3 sets • Isolation', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Seated Cable Rows', description: 'A stable exercise for back thickness.', goal: '3 sets of 12-20', subtitle: '3 sets • Hypertrophy', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Dumbbell Shoulder Press', description: 'Builds stable and strong shoulders.', goal: '3 sets of 10-15', subtitle: '3 sets • Hypertrophy', type: WorkoutType.repBased, icon: FontAwesomeIcons.dumbbell),
+      Workout(name: 'Bulgarian Split Squats', description: 'A challenging unilateral leg exercise.', goal: '3 sets of 10-15', subtitle: '3 sets • Stability', type: WorkoutType.repBased, icon: FontAwesomeIcons.personWalking),
+      Workout(name: 'T-Bar Rows', description: 'Targets the mid-back for thickness.', goal: '3 sets of 10-15', subtitle: '3 sets • Hypertrophy', type: WorkoutType.repBased, icon: FontAwesomeIcons.weightHanging),
+      Workout(name: 'Face Pulls', description: 'Crucial for rear delt and rotator cuff health.', goal: '4 sets of 20-30', subtitle: '4 sets • Health', type: WorkoutType.repBased, icon: FontAwesomeIcons.solidFaceGrin),
+      Workout(name: 'Hip Thrusts', description: 'The best exercise for direct glute work.', goal: '4 sets of 10-15', subtitle: '4 sets • Hypertrophy', type: WorkoutType.repBased, icon: FontAwesomeIcons.weightHanging),
+      Workout(name: 'Farmer\'s Walk', description: 'Builds immense grip strength and core stability.', goal: '3 sets of 30s', subtitle: '30 sec • Strength', type: WorkoutType.timeBased, icon: FontAwesomeIcons.personWalking),
+      Workout(name: 'Ab Wheel Rollouts', description: 'An advanced exercise for a strong core.', goal: '3 sets of 10-15', subtitle: '3 sets • Core', type: WorkoutType.repBased, icon: FontAwesomeIcons.gear),
+      Workout(name: 'Shrugs', description: 'Directly targets the traps.', goal: '4 sets of 15-20', subtitle: '4 sets • Isolation', type: WorkoutType.repBased, icon: FontAwesomeIcons.person),
+    ],
+    'Tired': [
+      Workout(name: 'Foam Rolling', description: 'Soothes sore muscles and aids recovery.', goal: '10 minutes', subtitle: '10 min • Recovery', type: WorkoutType.timeBased, icon: FontAwesomeIcons.circle),
+      Workout(name: 'Mobility Drills', description: 'Active movements to improve joint range.', goal: '15 minutes', subtitle: '15 min • Mobility', type: WorkoutType.timeBased, icon: FontAwesomeIcons.arrowsRotate),
+      Workout(name: 'Light Technique Work', description: 'Practice form on a main lift with very light weight.', goal: '5 sets of 5', subtitle: '5 sets • Technique', type: WorkoutType.repBased, icon: FontAwesomeIcons.feather),
+      Workout(name: 'Mindful Walking', description: 'Low-impact cardio to promote blood flow.', goal: '30 minutes', subtitle: '30 min • Cardio', type: WorkoutType.timeBased, icon: FontAwesomeIcons.personWalking),
+      Workout(name: 'Band Pull-Aparts', description: 'Strengthens the rear delts and upper back.', goal: '3 sets of 25-30', subtitle: '3 sets • Health', type: WorkoutType.repBased, icon: FontAwesomeIcons.gripLines),
+      Workout(name: 'Dead Hangs', description: 'Decompresses the spine and improves grip.', goal: '3 sets of 30s', subtitle: '30 sec • Health', type: WorkoutType.timeBased, icon: FontAwesomeIcons.hand),
+      Workout(name: 'Wall Slides', description: 'Improves shoulder mobility and posture.', goal: '3 sets of 15-20', subtitle: '3 sets • Mobility', type: WorkoutType.repBased, icon: FontAwesomeIcons.person),
+      Workout(name: 'Glute Bridges', description: 'Activates the glutes without heavy load.', goal: '3 sets of 20-25', subtitle: '3 sets • Activation', type: WorkoutType.repBased, icon: FontAwesomeIcons.arrowUp),
+      Workout(name: 'Bird-Dog', description: 'Enhances core stability and balance.', goal: '3 sets of 15-20', subtitle: '3 sets • Stability', type: WorkoutType.repBased, icon: FontAwesomeIcons.dog),
+      Workout(name: 'Cat-Cow Stretch', description: 'Increases spinal flexibility.', goal: '3 sets of 15-20', subtitle: '3 sets • Mobility', type: WorkoutType.repBased, icon: FontAwesomeIcons.cat),
+      Workout(name: 'Light Sled Drags', description: 'Active recovery that is easy on the joints.', goal: '10 minutes', subtitle: '10 min • Recovery', type: WorkoutType.timeBased, icon: FontAwesomeIcons.sleigh),
+      Workout(name: 'Light Yoga', description: 'Gentle poses to relax body and mind.', goal: '20 minutes', subtitle: '20 min • Flexibility', type: WorkoutType.timeBased, icon: FontAwesomeIcons.spa),
+      Workout(name: 'Couch Stretch', description: 'Opens up tight hip flexors.', goal: '3 sets of 60s', subtitle: '60 sec • Flexibility', type: WorkoutType.timeBased, icon: FontAwesomeIcons.couch),
+      Workout(name: 'Pigeon Pose', description: 'A deep stretch for the glutes and hips.', goal: '3 sets of 60s', subtitle: '60 sec • Flexibility', type: WorkoutType.timeBased, icon: FontAwesomeIcons.dove),
+      Workout(name: 'Gentle Swimming', description: 'Full-body, no-impact active recovery.', goal: '20 minutes', subtitle: '20 min • Cardio', type: WorkoutType.timeBased, icon: FontAwesomeIcons.personSwimming),
     ],
     'Calm': [
-      Workout(name: 'Box Breathing', description: 'A technique to calm the nervous system.', goal: '5 minutes', type: WorkoutType.breathing, icon: Icons.air),
-      Workout(name: 'Meditation', description: 'Train attention for mental clarity.', goal: '15 minutes', type: WorkoutType.timeBased, icon: Icons.psychology),
-      Workout(name: 'Balance Work', description: 'Exercises to improve stability.', goal: '10 minutes', type: WorkoutType.timeBased, icon: Icons.balance),
-      Workout(name: 'Body Scan', description: 'A mindfulness meditation practice.', goal: '10 minutes', type: WorkoutType.timeBased, icon: Icons.person_search),
-      Workout(name: 'Guided Imagery', description: 'Use your imagination to relax.', goal: '15 minutes', type: WorkoutType.timeBased, icon: Icons.landscape),
-      Workout(name: 'Yin Yoga', description: 'Slow-paced style with long-held poses.', goal: '30 minutes', type: WorkoutType.timeBased, icon: Icons.spa),
-      Workout(name: 'Restorative Poses', description: 'Gentle poses for deep relaxation.', goal: '20 minutes', type: WorkoutType.timeBased, icon: Icons.hotel),
-      Workout(name: 'Seated Meditation', description: 'The classic mindfulness practice.', goal: '10 minutes', type: WorkoutType.timeBased, icon: Icons.self_improvement),
-      Workout(name: 'Walking Meditation', description: 'Focus on the act of walking.', goal: '15 minutes', type: WorkoutType.timeBased, icon: Icons.directions_walk),
-      Workout(name: 'Listening Meditation', description: 'Focus on sounds around you.', goal: '10 minutes', type: WorkoutType.timeBased, icon: Icons.hearing),
-      Workout(name: 'Gratitude Journaling', description: 'Focus on positive aspects of your life.', goal: '5 minutes', type: WorkoutType.timeBased, icon: Icons.book),
-      Workout(name: 'Mindful Tea Drinking', description: 'Focus senses on the act of drinking tea.', goal: '5 minutes', type: WorkoutType.timeBased, icon: Icons.emoji_food_beverage),
-      Workout(name: 'Nature Observation', description: 'Sit and observe nature mindfully.', goal: '15 minutes', type: WorkoutType.timeBased, icon: Icons.nature_people),
-      Workout(name: 'Affirmation Repetition', description: 'Repeat positive phrases to yourself.', goal: '5 minutes', type: WorkoutType.timeBased, icon: Icons.record_voice_over),
-      Workout(name: 'Savasana', description: 'The final relaxation pose in yoga.', goal: '10 minutes', type: WorkoutType.timeBased, icon: Icons.airline_seat_flat),
+      Workout(name: 'Box Breathing', description: 'A technique to calm the nervous system.', goal: '5 minutes', subtitle: '5 min • Relaxation', type: WorkoutType.breathing, icon: FontAwesomeIcons.wind),
+      Workout(name: 'Walking Meditation', description: 'Mindful movement to focus the mind.', goal: '15 minutes', subtitle: '15 min • Mindfulness', type: WorkoutType.timeBased, icon: FontAwesomeIcons.personWalking),
+      Workout(name: 'Body Scan Meditation', description: 'Bring awareness to each part of your body.', goal: '10 minutes', subtitle: '10 min • Mindfulness', type: WorkoutType.timeBased, icon: FontAwesomeIcons.bed),
+      Workout(name: 'Yin Yoga', description: 'Slow-paced style with long-held poses.', goal: '30 minutes', subtitle: '30 min • Flexibility', type: WorkoutType.timeBased, icon: FontAwesomeIcons.spa),
+      Workout(name: 'Tai Chi Forms', description: 'A moving meditation for balance.', goal: '20 minutes', subtitle: '20 min • Balance', type: WorkoutType.timeBased, icon: FontAwesomeIcons.person),
+      Workout(name: 'Seated Meditation', description: 'Classic mindfulness practice.', goal: '15 minutes', subtitle: '15 min • Mindfulness', type: WorkoutType.timeBased, icon: FontAwesomeIcons.person),
+      Workout(name: 'Child\'s Pose', description: 'A restorative pose to relax and stretch.', goal: '5 minutes', subtitle: '5 min • Flexibility', type: WorkoutType.timeBased, icon: FontAwesomeIcons.child),
+      Workout(name: 'Legs Up The Wall', description: 'A passive, restorative pose.', goal: '10 minutes', subtitle: '10 min • Recovery', type: WorkoutType.timeBased, icon: FontAwesomeIcons.person),
+      Workout(name: 'Mindful Stretching', description: 'Focus on the sensation of each stretch.', goal: '15 minutes', subtitle: '15 min • Flexibility', type: WorkoutType.timeBased, icon: FontAwesomeIcons.person),
+      Workout(name: 'Nature Sounds', description: 'Listen to calming sounds of nature.', goal: '10 minutes', subtitle: '10 min • Relaxation', type: WorkoutType.timeBased, icon: FontAwesomeIcons.tree),
+      Workout(name: 'Guided Relaxation', description: 'Follow a guided meditation for relaxation.', goal: '15 minutes', subtitle: '15 min • Mindfulness', type: WorkoutType.timeBased, icon: FontAwesomeIcons.headphones),
+      Workout(name: 'Diaphragmatic Breathing', description: 'Deep belly breathing to reduce stress.', goal: '5 minutes', subtitle: '5 min • Relaxation', type: WorkoutType.breathing, icon: FontAwesomeIcons.wind),
+      Workout(name: 'Light Rowing', description: 'A rhythmic, meditative cardio exercise.', goal: '15 minutes', subtitle: '15 min • Cardio', type: WorkoutType.timeBased, icon: FontAwesomeIcons.person),
+      Workout(name: 'Savasana', description: 'The final relaxation pose in yoga.', goal: '10 minutes', subtitle: '10 min • Recovery', type: WorkoutType.timeBased, icon: FontAwesomeIcons.bed),
+      Workout(name: 'Mindful Doodling', description: 'A creative way to focus and de-stress.', goal: '10 minutes', subtitle: '10 min • Mindfulness', type: WorkoutType.timeBased, icon: FontAwesomeIcons.pencil),
     ],
   };
 
   final Map<String, IconData> _moodIcons = {
-    'Energetic': Icons.bolt,
-    'Strong': Icons.fitness_center,
-    'Calm': Icons.self_improvement,
-    'Tired': Icons.battery_saver,
+    'Energetic': FontAwesomeIcons.boltLightning,
+    'Strong': FontAwesomeIcons.dumbbell,
+    'Calm': FontAwesomeIcons.spa,
+    'Tired': FontAwesomeIcons.bed,
   };
 
   final Map<String, Color> _moodColors = {
@@ -134,12 +140,33 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   Set<String> _completedWorkoutsToday = {};
   String? _activeWorkoutName;
   bool _isTimerRunningInBackground = false;
+  var _listKey = const ValueKey<int>(0);
+  final PageController _pageController = PageController(viewportFraction: 0.8);
+  int _currentPage = 0;
+  late AnimationController _headerAnimController;
 
   @override
   void initState() {
     super.initState();
+    _headerAnimController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
     _loadSavedState();
     _checkAndShowMoodPopup();
+    _pageController.addListener(() {
+      if (mounted && _pageController.page != null) {
+        if (_pageController.page!.round() != _currentPage) {
+          setState(() {
+            _currentPage = _pageController.page!.round();
+          });
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _headerAnimController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSavedState() async {
@@ -198,7 +225,14 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
       _selectedMood = mood;
       _fullWorkoutList = fullList;
       _displayedWorkouts = fullList.take(5).toList();
+      _listKey = ValueKey<int>(_listKey.value + 1);
+      _headerAnimController.forward(from: 0);
     });
+
+    // Reset to the first page to ensure a consistent state
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
   }
 
   void _shuffleWorkouts() {
@@ -206,7 +240,13 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     fullList.shuffle();
     setState(() {
       _displayedWorkouts = fullList.take(5).toList();
+      _listKey = ValueKey<int>(_listKey.value + 1);
     });
+
+    // Reset to the first page to ensure a consistent state
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
   }
 
   void _showCompletionAnimation() {
@@ -246,30 +286,15 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   }
 
   void _showWorkoutDetailSheet(Workout workout) {
+    final Color currentMoodColor = _moodColors[_selectedMood] ?? accentColor;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: backgroundColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) {
-        String buttonText;
-        IconData buttonIcon;
-        switch (workout.type) {
-          case WorkoutType.timeBased:
-            buttonText = "Start Timer";
-            buttonIcon = Icons.timer_outlined;
-            break;
-          case WorkoutType.repBased:
-            buttonText = "Log Reps & Sets";
-            buttonIcon = Icons.format_list_numbered;
-            break;
-          case WorkoutType.breathing:
-            buttonText = "Begin Exercise";
-            buttonIcon = Icons.air;
-            break;
-        }
-
-        return Padding(
+      backgroundColor: Colors.black.withOpacity(0.5),
+      builder: (context) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -277,12 +302,13 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
             children: [
               Text(workout.name, textAlign: TextAlign.center, style: GoogleFonts.poppins(color: textColor, fontSize: 28, fontWeight: FontWeight.w600)),
               const SizedBox(height: 16),
-              if (workout.type == WorkoutType.repBased) Icon(workout.icon, size: 80, color: cardColor.withOpacity(0.5)),
+              if (workout.type == WorkoutType.repBased)
+                Center(child: FaIcon(workout.icon, size: 80, color: mutedTextColor)),
               Center(
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)),
-                  child: Text(workout.goal, style: GoogleFonts.poppins(color: _moodColors[_selectedMood] ?? accentColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: Text(workout.goal, style: GoogleFonts.poppins(color: currentMoodColor, fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -293,7 +319,11 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                   Navigator.pop(context);
                   Widget? nextScreen;
                   if (workout.type == WorkoutType.timeBased) {
-                    nextScreen = WorkoutTimerDialog(workout: workout, onDone: (cw) => _markWorkoutAsDone(cw));
+                    nextScreen = WorkoutTimerDialog(
+                      workout: workout,
+                      onDone: (cw) => _markWorkoutAsDone(cw),
+                      themeColor: currentMoodColor, // Pass the mood color
+                    );
                   } else if (workout.type == WorkoutType.repBased) {
                     nextScreen = RepLoggerDialog(workout: workout, onDone: (cw) => _markWorkoutAsDone(cw));
                   } else if (workout.type == WorkoutType.breathing) {
@@ -305,129 +335,232 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                     await _loadActiveWorkoutState();
                   }
                 },
-                icon: Icon(buttonIcon),
-                label: Text(buttonText, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+                icon: FaIcon(workout.icon, size: 18),
+                label: Text(workout.type == WorkoutType.timeBased ? "Start Timer" : "Log Reps & Sets", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
                 style: ElevatedButton.styleFrom(backgroundColor: accentColor, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
               ),
               const SizedBox(height: 12),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
   void _showMoodSelectionPopup() {
-    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: backgroundColor, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))), builder: (context) {
-      return Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0), child: Column(mainAxisSize: MainAxisSize.min, children: [
-        _buildSectionTitle("How do you feel today?"),
-        const SizedBox(height: 24),
-        GridView.count(crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 1.1, children: [
-          _buildMoodCard('Energetic', _moodIcons['Energetic']!, _moodColors['Energetic']!),
-          _buildMoodCard('Strong', _moodIcons['Strong']!, _moodColors['Strong']!),
-          _buildMoodCard('Calm', _moodIcons['Calm']!, _moodColors['Calm']!),
-          _buildMoodCard('Tired', _moodIcons['Tired']!, _moodColors['Tired']!),
-        ]),
-        const SizedBox(height: 20),
-      ]));
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.black.withOpacity(0.5), builder: (context) {
+      return BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Padding(padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0), child: Column(mainAxisSize: MainAxisSize.min, children: [
+          _buildSectionTitle("How do you feel today?"),
+          const SizedBox(height: 24),
+          GridView.count(crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 1.1, children: [
+            _buildMoodCard('Energetic', _moodIcons['Energetic']!, _moodColors['Energetic']!),
+            _buildMoodCard('Strong', _moodIcons['Strong']!, _moodColors['Strong']!),
+            _buildMoodCard('Calm', _moodIcons['Calm']!, _moodColors['Calm']!),
+            _buildMoodCard('Tired', _moodIcons['Tired']!, _moodColors['Tired']!),
+          ]),
+          const SizedBox(height: 20),
+        ])),
+      );
     },
     );
   }
 
-  Widget _buildSectionTitle(String title) => Text(title, textAlign: TextAlign.center, style: GoogleFonts.poppins(color: textColor, fontSize: 26, fontWeight: FontWeight.w600));
+  Widget _buildSectionTitle(String title, {bool withIcon = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(title, textAlign: TextAlign.center, style: GoogleFonts.poppins(color: textColor, fontSize: 26, fontWeight: FontWeight.w600)),
+        if (withIcon) ...[
+          const SizedBox(width: 8),
+          FaIcon(FontAwesomeIcons.fire, color: _moodColors[_selectedMood] ?? accentColor, size: 24),
+        ]
+      ],
+    );
+  }
 
-  Widget _buildMoodCard(String mood, IconData icon, Color color) => GestureDetector(onTap: () => _handleMoodSelection(mood), child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut, padding: const EdgeInsets.symmetric(vertical: 20), decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: color, width: 2), boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)]), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, size: 42, color: color), const SizedBox(height: 12), Text(mood, textAlign: TextAlign.center, style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.w500, fontSize: 16))])));
+  Widget _buildMoodCard(String mood, IconData icon, Color color) => GestureDetector(onTap: () => _handleMoodSelection(mood), child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut, padding: const EdgeInsets.symmetric(vertical: 20), decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: color, width: 2), boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)]), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [FaIcon(icon, size: 42, color: color), const SizedBox(height: 12), Text(mood, textAlign: TextAlign.center, style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.w500, fontSize: 16))])));
 
-  Widget _buildWorkoutCard(Workout workout) {
+  Widget _buildWorkoutCard(Workout workout, int index) {
     final bool isDone = _completedWorkoutsToday.contains(workout.name);
-    final bool hasActiveTimer = workout.name == _activeWorkoutName;
+    final bool isSelected = index == _currentPage;
+    final Color currentMoodColor = _moodColors[_selectedMood] ?? accentColor;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.1), width: 1)),
-      child: ListTile(
-        onTap: () async {
-          if (hasActiveTimer) {
-            Widget? nextScreen;
-            if (workout.type == WorkoutType.timeBased) {
-              nextScreen = WorkoutTimerDialog(workout: workout, onDone: (cw) => _markWorkoutAsDone(cw));
-            } else if (workout.type == WorkoutType.repBased){
-              nextScreen = RepLoggerDialog(workout: workout, onDone: (cw) => _markWorkoutAsDone(cw));
-            } else {
-              nextScreen = BreathingMinigameDialog(workout: workout, onDone: (cw) => _markWorkoutAsDone(cw), themeColor: _moodColors['Calm'] ?? Colors.blue);
-            }
-            await showDialog(context: context, barrierDismissible: false, builder: (_) => nextScreen!);
-            await _loadActiveWorkoutState();
-          } else {
-            _showWorkoutDetailSheet(workout);
-          }
-        },
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        leading: Icon(workout.icon, color: accentColor.withOpacity(0.8)),
-        title: Text(workout.name, style: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)),
-        subtitle: hasActiveTimer ? Text(_isTimerRunningInBackground ? "In Progress" : "Paused", style: GoogleFonts.poppins(color: Colors.orangeAccent, fontSize: 12)) : null,
-        trailing: isDone ? Icon(Icons.check_circle_outline, color: accentColor.withOpacity(0.7), size: 24) : (hasActiveTimer ? const Icon(Icons.timelapse, color: Colors.orangeAccent) : Icon(Icons.arrow_forward_ios, size: 16, color: textColor.withOpacity(0.5))),
+    return GestureDetector(
+      onTap: () => _showWorkoutDetailSheet(workout),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [cardColor, Colors.black],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          boxShadow: isSelected
+              ? [
+            BoxShadow(
+              color: currentMoodColor.withOpacity(0.3),
+              blurRadius: 15,
+              spreadRadius: 1,
+            ),
+          ]
+              : [],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FaIcon(_moodIcons[_selectedMood]!, color: textColor, size: 36),
+                      AnimatedCompletionRing(isCompleted: isDone, color: currentMoodColor),
+                    ],
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: currentMoodColor.withOpacity(0.35),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: FaIcon(
+                          workout.icon,
+                          size: 110,
+                          color: currentMoodColor.withOpacity(0.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Text(workout.name, style: GoogleFonts.poppins(color: textColor, fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(workout.subtitle, style: GoogleFonts.poppins(color: mutedTextColor, fontSize: 14)),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildBackgroundDecoration() {
-    final IconData? icon = _moodIcons[_selectedMood];
-    final Color? glowColor = _moodColors[_selectedMood];
-    if (icon == null || glowColor == null) return const SizedBox.shrink();
-    return Center(child: Transform.translate(offset: const Offset(0, -40), child: Text(String.fromCharCode(icon.codePoint), style: TextStyle(fontFamily: icon.fontFamily, package: icon.fontPackage, fontSize: 300, color: Colors.white.withOpacity(0.04), shadows: [Shadow(color: glowColor.withOpacity(0.3), blurRadius: 50.0)]))));
-  }
 
   @override
-  Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.transparent, body: Stack(children: [
-    _buildBackgroundDecoration(),
-    Padding(padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 20.0), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      _buildSectionTitle("Workouts for a\n$_selectedMood Day"),
-      const SizedBox(height: 12),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            TextButton.icon(
-              onPressed: _showMoodSelectionPopup,
-              icon: Icon(Icons.sync, size: 20, color: textColor.withOpacity(0.7)),
-              label: Text("Change Mood", style: GoogleFonts.poppins(color: textColor.withOpacity(0.7), fontWeight: FontWeight.w500)),
-              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-            ),
-            IconButton(onPressed: _shuffleWorkouts, icon: const Icon(Icons.shuffle), iconSize: 28, color: textColor.withOpacity(0.7), tooltip: "Shuffle Workouts"),
-          ],
-        ),
-      ),
-      const SizedBox(height: 12),
-      Expanded(
-        child: AnimationLimiter(
-          child: ListView.builder(
-            padding: const EdgeInsets.only(top: 0, bottom: 16),
-            itemCount: _displayedWorkouts.length,
-            itemBuilder: (context, index) {
-              return AnimationConfiguration.staggeredList(
-                position: index,
-                duration: const Duration(milliseconds: 400),
-                child: SlideAnimation(
-                  verticalOffset: 50.0,
-                  child: FadeInAnimation(
-                    child: _buildWorkoutCard(_displayedWorkouts[index]),
-                  ),
-                ),
-              );
-            },
+  Widget build(BuildContext context) {
+    final Color currentMoodColor = _moodColors[_selectedMood] ?? accentColor;
+
+    return Scaffold(backgroundColor: Colors.transparent, body: Stack(children: [
+      ...List.generate(10, (index) => GlowParticle(key: UniqueKey(), color: currentMoodColor)),
+      SafeArea(
+        child: Padding(padding: const EdgeInsets.symmetric(vertical: 20.0), child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          _buildSectionTitle("Workouts for a $_selectedMood Day"),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: _showMoodSelectionPopup,
+                icon: const FaIcon(FontAwesomeIcons.arrowsRotate, size: 18, color: mutedTextColor),
+                label: Text("Change Mood", style: GoogleFonts.poppins(color: mutedTextColor, fontWeight: FontWeight.w500)),
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              ),
+              const SizedBox(width: 16),
+              // --- MODIFIED BUTTON ---
+              TextButton.icon(
+                onPressed: _shuffleWorkouts,
+                icon: const FaIcon(FontAwesomeIcons.shuffle, size: 18, color: mutedTextColor),
+                label: Text("Shuffle", style: GoogleFonts.poppins(color: mutedTextColor, fontWeight: FontWeight.w500)),
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              ),
+            ],
           ),
-        ),
-      ),
-    ])),
-  ]));
+          const SizedBox(height: 8),
+          Expanded(
+            child: AnimationLimiter(
+              key: _listKey, // Key is now on the AnimationLimiter
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: _displayedWorkouts.length,
+                itemBuilder: (context, index) {
+                  return AnimationConfiguration.staggeredList(
+                    position: index,
+                    duration: const Duration(milliseconds: 500),
+                    child: SlideAnimation(
+                      verticalOffset: 50.0,
+                      child: FadeInAnimation(
+                        child: _buildWorkoutCard(_displayedWorkouts[index], index),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const FaIcon(FontAwesomeIcons.arrowLeft),
+                color: _currentPage == 0 ? mutedTextColor : textColor,
+                onPressed: _currentPage == 0
+                    ? null
+                    : () {
+                  _pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+              ),
+              IconButton(
+                icon: const FaIcon(FontAwesomeIcons.arrowRight),
+                color: _currentPage >= _displayedWorkouts.length - 1 ? mutedTextColor : textColor,
+                onPressed: _currentPage >= _displayedWorkouts.length - 1
+                    ? null
+                    : () {
+                  _pageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+              ),
+            ],
+          ),
+        ])),
+      )
+    ]));
+  }
 }
 
+// ... All Dialog Widgets are below ...
 class WorkoutTimerDialog extends StatefulWidget {
   final Workout workout;
   final Function(Workout) onDone;
-  const WorkoutTimerDialog({super.key, required this.workout, required this.onDone});
+  final Color themeColor;
+
+  const WorkoutTimerDialog({
+    super.key,
+    required this.workout,
+    required this.onDone,
+    required this.themeColor,
+  });
   @override
   State<WorkoutTimerDialog> createState() => _WorkoutTimerDialogState();
 }
@@ -541,6 +674,9 @@ class _WorkoutTimerDialogState extends State<WorkoutTimerDialog> with WidgetsBin
         } else {
           _timer?.cancel();
           setState(() => _isRunning = false);
+          _clearProgress();
+          widget.onDone(widget.workout);
+          Navigator.pop(context);
         }
       });
       setState(() => _isRunning = true);
@@ -557,7 +693,6 @@ class _WorkoutTimerDialogState extends State<WorkoutTimerDialog> with WidgetsBin
   @override
   Widget build(BuildContext context) {
     final progress = _initialDuration.inSeconds > 0 ? 1 - (_duration.inSeconds / _initialDuration.inSeconds) : 0.0;
-    final bool isTimerFinished = _duration.inSeconds == 0;
 
     return Dialog(
       backgroundColor: cardColor,
@@ -570,7 +705,7 @@ class _WorkoutTimerDialogState extends State<WorkoutTimerDialog> with WidgetsBin
             Align(
               alignment: Alignment.topRight,
               child: IconButton(
-                icon: Icon(Icons.close, color: textColor.withOpacity(0.7)),
+                icon: const FaIcon(FontAwesomeIcons.xmark, color: textColor),
                 onPressed: () async {
                   _timer?.cancel();
                   await _saveProgress();
@@ -587,26 +722,18 @@ class _WorkoutTimerDialogState extends State<WorkoutTimerDialog> with WidgetsBin
                 alignment: Alignment.center,
                 children: [
                   CircularProgressIndicator(value: 1.0, strokeWidth: 12, color: backgroundColor),
-                  CircularProgressIndicator(value: progress.isNaN || progress.isInfinite ? 0 : progress, strokeWidth: 12, color: accentColor, strokeCap: StrokeCap.round),
+                  CircularProgressIndicator(
+                    value: progress.isNaN || progress.isInfinite ? 0 : progress,
+                    strokeWidth: 12,
+                    color: widget.themeColor, // Use the passed mood color
+                    strokeCap: StrokeCap.butt,
+                  ),
                   Center(child: Text(_formatDuration(_duration), style: GoogleFonts.poppins(color: textColor, fontSize: 48, fontWeight: FontWeight.bold))),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            if (!isTimerFinished)
-              IconButton(onPressed: _toggleTimer, icon: Icon(_isRunning ? Icons.pause_circle_filled : Icons.play_circle_filled, color: textColor, size: 60)),
-            if (isTimerFinished)
-              const Icon(Icons.check_circle, color: Colors.greenAccent, size: 60),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: isTimerFinished ? () async {
-                await _clearProgress();
-                widget.onDone(widget.workout);
-                Navigator.pop(context);
-              } : null,
-              style: ElevatedButton.styleFrom(backgroundColor: accentColor.withOpacity(0.8), foregroundColor: Colors.white, disabledBackgroundColor: Colors.grey.withOpacity(0.2), padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-              child: Text("Finish Workout", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
+            IconButton(onPressed: _toggleTimer, icon: FaIcon(_isRunning ? FontAwesomeIcons.circlePause : FontAwesomeIcons.circlePlay, color: textColor, size: 60)),
           ],
         ),
       ),
@@ -677,13 +804,17 @@ class _RepLoggerDialogState extends State<RepLoggerDialog> {
     if (_completedSets < _targetSets) {
       setState(() {
         _completedSets++;
+        if (_completedSets >= _targetSets) {
+          _clearProgress();
+          widget.onDone(widget.workout);
+          Navigator.pop(context);
+        }
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isFinished = _completedSets >= _targetSets;
     final int currentSet = _completedSets + 1;
 
     return Dialog(
@@ -697,7 +828,7 @@ class _RepLoggerDialogState extends State<RepLoggerDialog> {
             Align(
               alignment: Alignment.topRight,
               child: IconButton(
-                icon: Icon(Icons.close, color: textColor.withOpacity(0.7)),
+                icon: FaIcon(FontAwesomeIcons.xmark, color: textColor.withOpacity(0.7)),
                 onPressed: () async {
                   await _saveProgress();
                   Navigator.pop(context);
@@ -706,26 +837,19 @@ class _RepLoggerDialogState extends State<RepLoggerDialog> {
             ),
             Text(widget.workout.name, style: GoogleFonts.poppins(color: textColor, fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 24),
-            if (!isFinished)
-              Text("Set $currentSet of $_targetSets", style: GoogleFonts.poppins(color: textColor.withOpacity(0.8), fontSize: 28, fontWeight: FontWeight.w600)),
-            if (isFinished)
-              const Icon(Icons.check_circle, color: Colors.greenAccent, size: 60),
+            Text("Set $currentSet of $_targetSets", style: GoogleFonts.poppins(color: textColor.withOpacity(0.8), fontSize: 28, fontWeight: FontWeight.w600)),
             const SizedBox(height: 16),
             Text("Goal: ${widget.workout.goal}", style: GoogleFonts.poppins(color: accentColor, fontSize: 16, fontWeight: FontWeight.w500)),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: isFinished ? () async {
-                await _clearProgress();
-                widget.onDone(widget.workout);
-                Navigator.pop(context);
-              } : _logSet,
+              onPressed: _logSet,
               style: ElevatedButton.styleFrom(
                 backgroundColor: accentColor.withOpacity(0.8),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: Text(isFinished ? "Finish Workout" : "Complete Set $currentSet", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+              child: Text("Complete Set $currentSet", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
           ],
         ),
@@ -767,6 +891,8 @@ class _BreathingMinigameDialogState extends State<BreathingMinigameDialog> with 
         _mainTimer.cancel();
         _breathingController.stop();
         if (mounted) setState(() => _instruction = "Done!");
+        widget.onDone(widget.workout);
+        Navigator.pop(context);
       }
     });
 
@@ -775,19 +901,19 @@ class _BreathingMinigameDialogState extends State<BreathingMinigameDialog> with 
       final value = _breathingController.value;
       if (mounted) {
         setState(() {
-          if (value < 0.25) { // Inhale
+          if (value < 0.25) {
             _instruction = "Breathe In...";
             _circleSize = 150 + (value * 4 * 100);
             _animatedColor = widget.themeColor;
-          } else if (value < 0.5) { // Hold Full
+          } else if (value < 0.5) {
             _instruction = "Hold";
             _circleSize = 250;
             _animatedColor = widget.themeColor;
-          } else if (value < 0.75) { // Exhale
+          } else if (value < 0.75) {
             _instruction = "Breathe Out...";
             _circleSize = 250 - ((value - 0.5) * 4 * 100);
             _animatedColor = widget.themeColor.withOpacity(0.5);
-          } else { // Hold Empty
+          } else {
             _instruction = "Hold";
             _circleSize = 150;
             _animatedColor = widget.themeColor.withOpacity(0.5);
@@ -823,7 +949,6 @@ class _BreathingMinigameDialogState extends State<BreathingMinigameDialog> with 
 
   @override
   Widget build(BuildContext context) {
-    bool isFinished = _totalDuration.inSeconds == 0;
     return Dialog(
       backgroundColor: cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -835,7 +960,7 @@ class _BreathingMinigameDialogState extends State<BreathingMinigameDialog> with 
             Align(
               alignment: Alignment.topRight,
               child: IconButton(
-                icon: Icon(Icons.close, color: textColor.withOpacity(0.7)),
+                icon: FaIcon(FontAwesomeIcons.xmark, color: textColor.withOpacity(0.7)),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
@@ -876,19 +1001,193 @@ class _BreathingMinigameDialogState extends State<BreathingMinigameDialog> with 
             ),
             Text(_formatDuration(_totalDuration), style: GoogleFonts.poppins(color: textColor, fontSize: 32, fontWeight: FontWeight.w600)),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: isFinished ? () {
-                widget.onDone(widget.workout);
-                Navigator.pop(context);
-              } : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor.withOpacity(0.8),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey.withOpacity(0.2),
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: Text("Finish", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AnimatedCompletionRing extends StatefulWidget {
+  final bool isCompleted;
+  final Color color;
+  const AnimatedCompletionRing({super.key, required this.isCompleted, required this.color});
+
+  @override
+  State<AnimatedCompletionRing> createState() => _AnimatedCompletionRingState();
+}
+
+class _AnimatedCompletionRingState extends State<AnimatedCompletionRing> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    if (widget.isCompleted) {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AnimatedCompletionRing oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isCompleted) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return SizedBox(
+          width: 36,
+          height: 36,
+          child: CustomPaint(
+            painter: _CompletionRingPainter(progress: _animation.value, color: widget.color),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CompletionRingPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  _CompletionRingPainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    final bgPaint = Paint()
+      ..color = mutedTextColor.withOpacity(0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    canvas.drawCircle(center, radius, bgPaint);
+
+    final progressPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.butt
+      ..shader = SweepGradient(
+        colors: [color.withOpacity(0.3), color],
+        startAngle: -pi / 2,
+        endAngle: 2 * pi,
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -pi / 2,
+      2 * pi * progress,
+      false,
+      progressPaint,
+    );
+
+    if (progress > 0.99) {
+      final tickPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 2.0);
+
+      final path = Path();
+      path.moveTo(center.dx - radius * 0.4, center.dy);
+      path.lineTo(center.dx - radius * 0.1, center.dy + radius * 0.3);
+      path.lineTo(center.dx + radius * 0.4, center.dy - radius * 0.3);
+
+      canvas.drawPath(path, tickPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CompletionRingPainter oldDelegate) => oldDelegate.progress != progress || oldDelegate.color != color;
+}
+
+class GlowParticle extends StatefulWidget {
+  final Color color;
+  const GlowParticle({super.key, required this.color});
+
+  @override
+  State<GlowParticle> createState() => _GlowParticleState();
+}
+
+class _GlowParticleState extends State<GlowParticle> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late double x, y, size, opacity;
+  final Random _random = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _resetParticle();
+    _controller = AnimationController(
+      duration: Duration(seconds: _random.nextInt(5) + 5),
+      vsync: this,
+    )
+      ..addListener(() => setState(() {}))
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          _resetParticle();
+          _controller.forward(from: 0);
+        }
+      });
+
+    Future.delayed(Duration(milliseconds: _random.nextInt(5000)), () {
+      if(mounted) {
+        _controller.forward();
+      }
+    });
+  }
+
+  void _resetParticle() {
+    x = _random.nextDouble();
+    y = 1.1;
+    size = _random.nextDouble() * 4 + 1;
+    opacity = _random.nextDouble() * 0.3 + 0.1;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double currentY = y - (_controller.value * 1.2);
+    return Positioned(
+      left: x * MediaQuery.of(context).size.width,
+      top: currentY * MediaQuery.of(context).size.height,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: widget.color.withOpacity(opacity),
+          boxShadow: [
+            BoxShadow(
+              color: widget.color.withOpacity(opacity * 0.5),
+              blurRadius: size * 2,
+              spreadRadius: size,
             ),
           ],
         ),

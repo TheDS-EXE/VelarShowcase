@@ -479,18 +479,8 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
     _loadStreakData();
   }
 
-  void _navigateToGoalsScreen() async {
-    await Navigator.pushNamed(context, '/goals');
-    refreshData();
-  }
-
   void _navigateToCaloriesScreen() async {
     await Navigator.pushNamed(context, '/calories');
-    refreshData();
-  }
-
-  void _navigateToProgressScreen() async {
-    await Navigator.pushNamed(context, '/progress');
     refreshData();
   }
 
@@ -552,41 +542,6 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
             _buildPersonalBestShowcase(),
             const SizedBox(height: 30),
             _buildStreakHeatmap(),
-            const SizedBox(height: 16),
-            GlassCard(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Quick Actions",
-                      style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: textColor)),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildActionButton(
-                        icon: Icons.restaurant,
-                        label: "Log Food",
-                        onTap: _navigateToCaloriesScreen,
-                      ),
-                      _buildActionButton(
-                        icon: Icons.fitness_center,
-                        label: "Progress",
-                        onTap: _navigateToProgressScreen,
-                      ),
-                      _buildActionButton(
-                        icon: Icons.flag,
-                        label: "Goals",
-                        onTap: _navigateToGoalsScreen,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -959,28 +914,6 @@ class _NutritionTrackerScreenState extends State<NutritionTrackerScreen>
             ),
           ],
         ),
-      ],
-    );
-  }
-
-
-  Widget _buildActionButton(
-      {required IconData icon,
-        required String label,
-        required VoidCallback onTap}) {
-    return Column(
-      children: [
-        IconButton(
-          onPressed: onTap,
-          icon: Icon(icon, size: 24, color: accentColor),
-          style: IconButton.styleFrom(
-            backgroundColor: accentColor.withOpacity(0.2),
-            padding: const EdgeInsets.all(12),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(label,
-            style: GoogleFonts.inter(color: textColor, fontSize: 11)),
       ],
     );
   }
